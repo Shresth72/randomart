@@ -1,3 +1,4 @@
+#include "node.h"
 #include <math.h>
 #include <stdio.h>
 
@@ -19,38 +20,13 @@
 
 static Arena node_arena = {0};
 
-typedef struct Node Node;
+Node *node_number(float number) {
+  Node *node = arena_alloc(&node_arena, sizeof(Node));
+  node->kind = NK_NUMBER;
+  node->as.number = number;
 
-typedef enum {
-  NK_X,
-  NK_Y,
-  NK_NUMBER,
-  NK_ADD,
-  NK_MULT,
-  NK_TRIPLE,
-} Node_Kind;
-
-typedef struct {
-  Node *lhs;
-  Node *rhs;
-} Node_Binop;
-
-typedef struct {
-  Node *first;
-  Node *second;
-  Node *third;
-} Node_Triple;
-
-typedef union {
-  float number;
-  Node_Binop binop;
-  Node_Triple triple;
-} Node_As;
-
-struct Node {
-  Node_Kind kind;
-  Node_As as;
-};
+  return node;
+}
 
 typedef struct {
   uint8_t r;
@@ -98,7 +74,7 @@ void render_pixels(Color (*f)(float x, float y)) {
 int main() {
   render_pixels(cool);
 
-  const char *output_path = "output_path.png";
+  const char *output_path = "output/output_path.png";
   if (!stbi_write_png(output_path, WIDTH, HEIGHT, 4, pixels,
                       WIDTH * sizeof(RGBA32))) {
     nob_log(ERROR, "Could not save image: %s", output_path);

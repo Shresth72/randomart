@@ -19,7 +19,7 @@ int main(int argc, char *argv[]) {
     if (!cmd_run_sync_and_reset(&cmd))
       return 1;
 
-    cmd_append(&cmd, "kitty", "icat", "output_path.png");
+    cmd_append(&cmd, "kitty", "icat", "output/output_path.png");
     if (!cmd_run_sync_and_reset(&cmd))
       return 1;
   }
