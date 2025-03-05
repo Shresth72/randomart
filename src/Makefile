@@ -1,4 +1,7 @@
 run:
+	./nob run
+
+compile:
 	./nob
 
 view:

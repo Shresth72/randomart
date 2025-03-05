@@ -3,16 +3,16 @@
 
 #define NOB_IMPLEMENTATION
 #define NOB_STRIP_PREFIX
-#include "nob.h"
+#include "lib/nob.h"
 
 #define ARENA_IMPLEMENTATION
-#include "arena.h"
+#include "lib/arena.h"
 
 #define STB_IMAGE_IMPLEMENTATION
-#include "stb_image.h"
+#include "lib/stb_image.h"
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "stb_image_write.h"
+#include "lib/stb_image_write.h"
 
 #define WIDTH 400
 #define HEIGHT 400
