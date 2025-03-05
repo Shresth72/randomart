@@ -1,13 +1,10 @@
 #include "node.h"
-#include <math.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #define NOB_IMPLEMENTATION
 #define NOB_STRIP_PREFIX
 #include "lib/nob.h"
-
-#define ARENA_IMPLEMENTATION
-#include "lib/arena.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "lib/stb_image.h"
@@ -18,14 +15,43 @@
 #define WIDTH 400
 #define HEIGHT 400
 
-static Arena node_arena = {0};
-
-Node *node_number(float number) {
-  Node *node = arena_alloc(&node_arena, sizeof(Node));
-  node->kind = NK_NUMBER;
-  node->as.number = number;
-
-  return node;
+void node_print(Node *node) {
+  switch (node->kind) {
+  case NK_X:
+    printf("x");
+    break;
+  case NK_Y:
+    printf("y");
+    break;
+  case NK_NUMBER:
+    printf("%f", node->as.number);
+    break;
+  case NK_ADD:
+    printf("add(");
+    node_print(node->as.binop.lhs);
+    printf(", ");
+    node_print(node->as.binop.rhs);
+    printf(")");
+    break;
+  case NK_MULT:
+    printf("mult(");
+    node_print(node->as.binop.lhs);
+    printf(", ");
+    node_print(node->as.binop.rhs);
+    printf(")");
+    break;
+  case NK_TRIPLE:
+    printf("(");
+    node_print(node->as.triple.first);
+    printf(", ");
+    node_print(node->as.triple.second);
+    printf(", ");
+    node_print(node->as.triple.third);
+    printf(")");
+    break;
+  default:
+    UNREACHABLE("node_print");
+  }
 }
 
 typedef struct {
@@ -72,6 +98,12 @@ void render_pixels(Color (*f)(float x, float y)) {
 }
 
 int main() {
+  Node *node = node_triple(node_add(node_x(), node_y()),
+                           node_mult(node_x(), node_y()), node_number(0.5));
+  node_print(node);
+  printf("\n");
+  exit(69);
+
   render_pixels(cool);
 
   const char *output_path = "output/output_path.png";

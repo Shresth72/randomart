@@ -1,4 +1,6 @@
 #pragma once
+#include <math.h>
+#include <stdio.h>
 
 typedef struct Node Node;
 
@@ -32,3 +34,12 @@ struct Node {
   Node_Kind kind;
   Node_As as;
 };
+
+void node_print(Node *node);
+
+Node *node_number(float number);
+Node *node_x(void);
+Node *node_y(void);
+Node *node_add(Node *lhs, Node *rhs);
+Node *node_mult(Node *lhs, Node *rhs);
+Node *node_triple(Node *first, Node *second, Node *third);
