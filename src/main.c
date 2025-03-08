@@ -27,35 +27,6 @@ typedef struct {
   float r, g, b;
 } Color;
 
-Color gray_gradient(float x, float y) {
-  UNUSED(y);
-  return (Color){x, x, x};
-}
-
-Color cool(float x, float y) {
-  if (x * y >= 0)
-    return (Color){x, y, 1};
-
-  float r = fmodf(x, y);
-  return (Color){r, r, r};
-}
-
-bool expect_number(Node *expr) {
-  if (expr->kind != NK_NUMBER) {
-    printf("%s:%d: ERROR: expected number\n", expr->file, expr->line);
-    return false;
-  }
-  return true;
-}
-
-bool expect_triple(Node *expr) {
-  if (expr->kind != NK_TRIPLE) {
-    printf("%s:%d: ERROR: expected triple\n", expr->file, expr->line);
-    return false;
-  }
-  return true;
-}
-
 bool expect_kind(Node *expr, Node_Kind kind) {
   if (expr->kind != kind) {
     printf("%s:%d: ERROR: expected '%s' but got '%s'\n", expr->file, expr->line,
@@ -65,7 +36,7 @@ bool expect_kind(Node *expr, Node_Kind kind) {
   return true;
 }
 
-#define node_print_ln(node) (node_print(node), printf("\n"))
+#define NODE_PRINT_LN(node) (node_print(node), printf("\n"))
 void node_print(Node *node) {
   switch (node->kind) {
   case NK_X:
@@ -116,7 +87,7 @@ void node_print(Node *node) {
   }
 }
 
-#define node_binop_loc(kind, lhs, rhs)                                         \
+#define BINOP_MAPPER(kind, lhs, rhs)                                           \
   ((kind) == NK_ADD    ? ((lhs) + (rhs))                                       \
    : (kind) == NK_MULT ? ((lhs) * (rhs))                                       \
    : (kind) == NK_MOD  ? fmodf((lhs), (rhs))                                   \
@@ -134,11 +105,11 @@ Node *eval_binop(Node *expr, float x, float y, Node_Kind kind) {
   if (expr->kind == NK_ADD || expr->kind == NK_MULT || expr->kind == NK_MOD) {
     return node_number_loc(
         expr->file, expr->line,
-        node_binop_loc(expr->kind, lhs->as.number, rhs->as.number));
+        BINOP_MAPPER(expr->kind, lhs->as.number, rhs->as.number));
   } else if (expr->kind == NK_GT) {
     return node_boolean_loc(
         expr->file, expr->line,
-        node_binop_loc(expr->kind, lhs->as.number, rhs->as.number));
+        BINOP_MAPPER(expr->kind, lhs->as.number, rhs->as.number));
   }
 
   return NULL;
@@ -177,11 +148,11 @@ Node *eval(Node *expr, float x, float y) {
       return NULL;
 
     Node *then = eval(expr->as.iff.then, x, y);
-    if (!then || !expect_kind(then, NK_BOOLEAN))
+    if (!then || !expect_kind(then, NK_TRIPLE))
       return NULL;
 
     Node *elze = eval(expr->as.iff.elze, x, y);
-    if (!elze || !expect_kind(elze, NK_BOOLEAN))
+    if (!elze || !expect_kind(elze, NK_TRIPLE))
       return NULL;
 
     return cond->as.boolean ? then : elze;
@@ -232,12 +203,23 @@ bool render_pixels(Node *f) {
 
 Node *gray_gradient_ast() {
   Node *node = node_triple(node_x(), node_x(), node_x());
-  node_print_ln(node);
+  NODE_PRINT_LN(node);
+  return node;
+}
+
+Node *cool_gradient_ast() {
+  Node *node = node_if(node_gt(node_mult(node_x(), node_y()), node_number(0)),
+                       node_triple(node_x(), node_y(), node_number(1)),
+                       node_triple(node_mod(node_x(), node_y()),
+                                   node_mod(node_x(), node_y()),
+                                   node_mod(node_x(), node_y())));
+  NODE_PRINT_LN(node);
   return node;
 }
 
 int main() {
-  bool ok = render_pixels(gray_gradient_ast());
+  // bool ok = render_pixels(gray_gradient_ast());
+  bool ok = render_pixels(cool_gradient_ast());
   if (!ok)
     return 1;
 
