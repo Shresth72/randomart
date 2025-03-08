@@ -69,9 +69,20 @@ struct Node {
   Node_As as;
 };
 
-void node_print(Node *node);
+// MAIN FUNCTIONS
 Node *eval(Node *expr, float x, float y);
+Node *eval_binop(Node *expr, float x, float y, Node_Kind kind);
+bool render_pixels(Node *f);
 
+// GRADIENTS
+Node *gray_gradient_ast();
+Node *cool_gradient_ast();
+
+// UTILS FUNCTIONS
+void node_print(Node *node);
+bool expect_kind(Node *expr, Node_Kind kind);
+
+// GRAMMAR FUNCTIONS
 Node *node_loc(const char *file, int line, Node_Kind kind);
 
 Node *node_number_loc(const char *file, int line, float number);
@@ -87,7 +98,10 @@ Node *node_triple_loc(const char *file, int line, Node *first, Node *second,
 Node *node_if_loc(const char *file, int line, Node *cond, Node *then,
                   Node *elze);
 
-// MACROS
+// UTIL MACROS
+#define NODE_PRINT_LN(node) (node_print(node), printf("\n"))
+
+// GRAMMAR MACROS
 #define node_x() node_loc(__FILE__, __LINE__, NK_X)
 #define node_y() node_loc(__FILE__, __LINE__, NK_Y)
 #define node_number(number) node_number_loc(__FILE__, __LINE__, number)
