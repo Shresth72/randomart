@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 typedef struct Node Node;
 
@@ -22,6 +23,11 @@ typedef enum {
   // Operation Wrappers
   NK_TRIPLE,
   NK_IF,
+
+  // Rule (ref to another grammar rule index)
+  NK_RULE,
+  NK_RANDOM,
+  COUNT_NK,
 } Node_Kind;
 
 #define node_kind_string(kind)                                                 \
@@ -35,6 +41,8 @@ typedef enum {
    : (kind) == NK_GT      ? "gt"                                               \
    : (kind) == NK_TRIPLE  ? "triple"                                           \
    : (kind) == NK_IF      ? "if"                                               \
+   : (kind) == NK_RULE    ? "rule"                                             \
+   : (kind) == NK_RANDOM  ? "random"                                           \
                           : "unknown")
 
 typedef struct {
@@ -58,8 +66,11 @@ typedef union {
   float number;
   bool boolean;
   Node_Binop binop;
+
   Node_Triple triple;
   Node_If iff;
+
+  int rule;
 } Node_As;
 
 struct Node {
@@ -87,7 +98,10 @@ Node *node_loc(const char *file, int line, Node_Kind kind);
 
 Node *node_number_loc(const char *file, int line, float number);
 Node *node_boolean_loc(const char *file, int line, bool boolean);
+Node *node_rule_loc(const char *file, int line, int rule);
 
+Node *node_binop_loc(const char *file, int line, Node_Kind kind, Node *lhs,
+                     Node *rhs);
 Node *node_add_loc(const char *file, int line, Node *lhs, Node *rhs);
 Node *node_mult_loc(const char *file, int line, Node *lhs, Node *rhs);
 Node *node_mod_loc(const char *file, int line, Node *lhs, Node *rhs);
@@ -100,12 +114,21 @@ Node *node_if_loc(const char *file, int line, Node *cond, Node *then,
 
 // UTIL MACROS
 #define NODE_PRINT_LN(node) (node_print(node), printf("\n"))
+#define UNREACHABLE_CODE(message)                                              \
+  do {                                                                         \
+    fprintf(stderr, "%s:%d: UNREACHABLE CODE: %s\n", __FILE__, __LINE__,       \
+            message);                                                          \
+    abort();                                                                   \
+  } while (0)
 
 // GRAMMAR MACROS
 #define node_x() node_loc(__FILE__, __LINE__, NK_X)
 #define node_y() node_loc(__FILE__, __LINE__, NK_Y)
+#define node_random() node_loc(__FILE__, __LINE__, NK_RANDOM)
+
 #define node_number(number) node_number_loc(__FILE__, __LINE__, number)
 #define node_boolean(number) node_boolean_loc(__FILE__, __LINE__, boolean)
+#define node_rule(rule) node_rule_loc(__FILE__, __LINE__, rule)
 
 #define node_add(lhs, rhs) node_add_loc(__FILE__, __LINE__, lhs, rhs)
 #define node_mult(lhs, rhs) node_mult_loc(__FILE__, __LINE__, lhs, rhs)

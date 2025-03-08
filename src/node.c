@@ -1,37 +1,29 @@
 #include "node.h"
 
-#define ARENA_IMPLEMENTATION
-#include "lib/arena.h"
-
-static Arena node_arena = {0};
-
-bool expect_kind(Node *expr, Node_Kind kind) {
-  if (expr->kind != kind) {
-    printf("%s:%d: ERROR: expected '%s' but got '%s'\n", expr->file, expr->line,
-           node_kind_string(kind), node_kind_string(expr->kind));
-    return false;
-  }
-  return true;
-}
-
-Node *node_loc(const char *file, int line, Node_Kind kind) {
-  Node *node = arena_alloc(&node_arena, sizeof(Node));
-  node->kind = kind;
-  node->file = file;
-  node->line = line;
-
-  return node;
-}
-
+// Node Kind Allocator
 Node *node_number_loc(const char *file, int line, float number) {
   Node *node = node_loc(file, line, NK_NUMBER);
   node->as.number = number;
   return node;
 }
 
+Node *node_rule_loc(const char *file, int line, int rule) {
+  Node *node = node_loc(file, line, NK_RULE);
+  node->as.rule = rule;
+  return node;
+}
+
 Node *node_boolean_loc(const char *file, int line, bool boolean) {
   Node *node = node_loc(file, line, NK_BOOLEAN);
   node->as.boolean = boolean;
+  return node;
+}
+
+Node *node_binop_loc(const char *file, int line, Node_Kind kind, Node *lhs,
+                     Node *rhs) {
+  Node *node = node_loc(file, line, kind);
+  node->as.binop.lhs = lhs;
+  node->as.binop.rhs = rhs;
   return node;
 }
 
@@ -65,6 +57,16 @@ Node *node_if_loc(const char *file, int line, Node *cond, Node *then,
   node->as.iff.elze = elze;
 
   return node;
+}
+
+// UTILS
+bool expect_kind(Node *expr, Node_Kind kind) {
+  if (expr->kind != kind) {
+    printf("%s:%d: ERROR: expected '%s' but got '%s'\n", expr->file, expr->line,
+           node_kind_string(kind), node_kind_string(expr->kind));
+    return false;
+  }
+  return true;
 }
 
 void node_print(Node *node) {
@@ -112,8 +114,16 @@ void node_print(Node *node) {
     node_print(node->as.iff.elze);
     break;
 
+  case NK_RULE:
+    printf("%s (%d)", node_kind_string(node->kind), node->as.rule);
+    break;
+  case NK_RANDOM:
+    printf("%s", node_kind_string(node->kind));
+    break;
+
+  case COUNT_NK:
   default:
-    // UNREACHABLE("node_print");
+    UNREACHABLE_CODE("node_print");
     return;
   }
 }

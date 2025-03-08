@@ -9,7 +9,7 @@ int main(int argc, char *argv[]) {
   Nob_Cmd cmd = {0};
   cmd_append(&cmd, "cc");
   cmd_append(&cmd, "-o", "main");
-  cmd_append(&cmd, "main.c", "node.c");
+  cmd_append(&cmd, "main.c", "node.c", "grammar.c");
   cmd_append(&cmd, "-lm");
   cmd_append(&cmd, "-Wall", "-Wextra", "-Wswitch-enum");
 
