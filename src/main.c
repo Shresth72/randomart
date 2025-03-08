@@ -1,4 +1,5 @@
 #include "node.h"
+#include <stdio.h>
 
 #define NOB_IMPLEMENTATION
 #define NOB_STRIP_PREFIX
@@ -12,45 +13,6 @@
 
 #define WIDTH 400
 #define HEIGHT 400
-
-void node_print(Node *node) {
-  switch (node->kind) {
-  case NK_X:
-    printf("x");
-    break;
-  case NK_Y:
-    printf("y");
-    break;
-  case NK_NUMBER:
-    printf("%f", node->as.number);
-    break;
-  case NK_ADD:
-    printf("add(");
-    node_print(node->as.binop.lhs);
-    printf(", ");
-    node_print(node->as.binop.rhs);
-    printf(")");
-    break;
-  case NK_MULT:
-    printf("mult(");
-    node_print(node->as.binop.lhs);
-    printf(", ");
-    node_print(node->as.binop.rhs);
-    printf(")");
-    break;
-  case NK_TRIPLE:
-    printf("(");
-    node_print(node->as.triple.first);
-    printf(", ");
-    node_print(node->as.triple.second);
-    printf(", ");
-    node_print(node->as.triple.third);
-    printf(")");
-    break;
-  default:
-    UNREACHABLE("node_print");
-  }
-}
 
 typedef struct {
   uint8_t r;
@@ -94,14 +56,6 @@ bool expect_triple(Node *expr) {
   return true;
 }
 
-#define node_kind_string(kind)                                                 \
-  ((kind) == NK_X        ? "x"                                                 \
-   : (kind) == NK_Y      ? "y"                                                 \
-   : (kind) == NK_NUMBER ? "number"                                            \
-   : (kind) == NK_ADD    ? "add"                                               \
-   : (kind) == NK_MULT   ? "multiply"                                          \
-   : (kind) == NK_TRIPLE ? "triple"                                            \
-                         : "unknown")
 bool expect_kind(Node *expr, Node_Kind kind) {
   if (expr->kind != kind) {
     printf("%s:%d: ERROR: expected '%s' but got '%s'\n", expr->file, expr->line,
@@ -111,18 +65,83 @@ bool expect_kind(Node *expr, Node_Kind kind) {
   return true;
 }
 
-Node *eval_binop(Node *expr, float x, float y) {
+#define node_print_ln(node) (node_print(node), printf("\n"))
+void node_print(Node *node) {
+  switch (node->kind) {
+  case NK_X:
+  case NK_Y:
+    printf(node_kind_string(node->kind));
+    break;
+
+  case NK_NUMBER:
+    printf("%f", node->as.number);
+    break;
+
+  case NK_BOOLEAN:
+    printf("%s", node->as.boolean ? "true" : "false");
+    break;
+
+  case NK_ADD:
+  case NK_MULT:
+  case NK_MOD:
+  case NK_GT:
+    printf("%s(", node_kind_string(node->kind));
+    node_print(node->as.binop.lhs);
+    printf(", ");
+    node_print(node->as.binop.rhs);
+    printf(")");
+    break;
+
+  case NK_TRIPLE:
+    printf("(");
+    node_print(node->as.triple.first);
+    printf(", ");
+    node_print(node->as.triple.second);
+    printf(", ");
+    node_print(node->as.triple.third);
+    printf(")");
+    break;
+
+  case NK_IF:
+    printf("if ");
+    node_print(node->as.iff.cond);
+    printf(" then ");
+    node_print(node->as.iff.then);
+    printf(" else ");
+    node_print(node->as.iff.elze);
+    break;
+
+  default:
+    UNREACHABLE("node_print");
+  }
+}
+
+#define node_binop_loc(kind, lhs, rhs)                                         \
+  ((kind) == NK_ADD    ? ((lhs) + (rhs))                                       \
+   : (kind) == NK_MULT ? ((lhs) * (rhs))                                       \
+   : (kind) == NK_MOD  ? fmodf((lhs), (rhs))                                   \
+   : (kind) == NK_GT   ? ((lhs) > (rhs))                                       \
+                       : 0)
+Node *eval_binop(Node *expr, float x, float y, Node_Kind kind) {
   Node *lhs = eval(expr->as.binop.lhs, x, y);
-  if (!lhs || !expect_kind(lhs, NK_NUMBER))
+  if (!lhs || !expect_kind(lhs, kind))
     return NULL;
 
   Node *rhs = eval(expr->as.binop.rhs, x, y);
-  if (!rhs || !expect_kind(rhs, NK_NUMBER))
+  if (!rhs || !expect_kind(rhs, kind))
     return NULL;
 
-  float result = (expr->kind == NK_ADD) ? (lhs->as.number + rhs->as.number)
-                                        : (lhs->as.number * rhs->as.number);
-  return node_number_loc(expr->file, expr->line, result);
+  if (expr->kind == NK_ADD || expr->kind == NK_MULT || expr->kind == NK_MOD) {
+    return node_number_loc(
+        expr->file, expr->line,
+        node_binop_loc(expr->kind, lhs->as.number, rhs->as.number));
+  } else if (expr->kind == NK_GT) {
+    return node_boolean_loc(
+        expr->file, expr->line,
+        node_binop_loc(expr->kind, lhs->as.number, rhs->as.number));
+  }
+
+  return NULL;
 }
 
 Node *eval(Node *expr, float x, float y) {
@@ -134,11 +153,14 @@ Node *eval(Node *expr, float x, float y) {
     return node_number_loc(expr->file, expr->line, y);
 
   case NK_NUMBER:
+  case NK_BOOLEAN:
     return expr;
 
   case NK_ADD:
   case NK_MULT:
-    return eval_binop(expr, x, y);
+  case NK_MOD:
+  case NK_GT:
+    return eval_binop(expr, x, y, NK_NUMBER);
 
   case NK_TRIPLE: {
     Node *first = eval(expr->as.triple.first, x, y);
@@ -149,13 +171,29 @@ Node *eval(Node *expr, float x, float y) {
                : NULL;
   }
 
+  case NK_IF: {
+    Node *cond = eval(expr->as.iff.cond, x, y);
+    if (!cond || !expect_kind(cond, NK_BOOLEAN))
+      return NULL;
+
+    Node *then = eval(expr->as.iff.then, x, y);
+    if (!then || !expect_kind(then, NK_BOOLEAN))
+      return NULL;
+
+    Node *elze = eval(expr->as.iff.elze, x, y);
+    if (!elze || !expect_kind(elze, NK_BOOLEAN))
+      return NULL;
+
+    return cond->as.boolean ? then : elze;
+  }
+
   default:
     UNREACHABLE("eval");
   }
 }
 
-bool eval_func(Node *body, float x, float y, Color *c) {
-  Node *result = eval(body, x, y);
+bool eval_func(Node *f, float x, float y, Color *c) {
+  Node *result = eval(f, x, y); // Evaluated ast
 
   if (!result || !expect_kind(result, NK_TRIPLE))
     return false;
@@ -170,47 +208,38 @@ bool eval_func(Node *body, float x, float y, Color *c) {
   return true;
 }
 
-void render_pixels(Color (*f)(float x, float y)) {
+bool render_pixels(Node *f) {
   for (size_t y = 0; y < HEIGHT; ++y) {
     // 0..<HEIGHT => 0..1 => 0..2 => -1..1
     float ny = (float)y / HEIGHT * 2.0f - 1;
     for (size_t x = 0; x < WIDTH; ++x) {
       float nx = (float)x / WIDTH * 2.0f - 1;
-      Color c = f(nx, ny);
-      size_t index = y * WIDTH + x;
 
+      Color c;
+      if (!eval_func(f, nx, ny, &c))
+        return false;
+
+      size_t index = y * WIDTH + x;
       pixels[index].r = (c.r + 1) / 2 * 255;
       pixels[index].g = (c.g + 1) / 2 * 255;
       pixels[index].b = (c.b + 1) / 2 * 255;
       pixels[index].a = 255;
     }
   }
+
+  return true;
 }
 
-// MACROS
-#define node_print_ln(node) (node_print(node), printf("\n"))
-
-#define node_number(number) node_number_loc(__FILE__, __LINE__, number)
-#define node_x() node_loc(__FILE__, __LINE__, NK_X)
-#define node_y() node_loc(__FILE__, __LINE__, NK_Y)
-#define node_add(lhs, rhs) node_add_loc(__FILE__, __LINE__, lhs, rhs)
-#define node_mult(lhs, rhs) node_mult_loc(__FILE__, __LINE__, lhs, rhs)
-#define node_triple(first, second, third)                                      \
-  node_triple_loc(__FILE__, __LINE__, first, second, third)
+Node *gray_gradient_ast() {
+  Node *node = node_triple(node_x(), node_x(), node_x());
+  node_print_ln(node);
+  return node;
+}
 
 int main() {
-  Node *node =
-      node_triple(node_add(node_triple(node_x(), node_x(), node_x()), node_y()),
-                  node_y(), node_number(0.5));
-
-  node_print_ln(node);
-  Node *result = eval(node, 2, 2);
-  if (!result)
-    return 0;
-  node_print_ln(result);
-  exit(69);
-
-  render_pixels(cool);
+  bool ok = render_pixels(gray_gradient_ast());
+  if (!ok)
+    return 1;
 
   const char *output_path = "output/output_path.png";
   if (!stbi_write_png(output_path, WIDTH, HEIGHT, 4, pixels,

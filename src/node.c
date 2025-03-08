@@ -1,6 +1,4 @@
 #include "node.h"
-#include <stdio.h>
-#include <stdlib.h>
 
 #define ARENA_IMPLEMENTATION
 #include "lib/arena.h"
@@ -33,6 +31,12 @@ Node *node_mult_loc(const char *file, int line, Node *lhs, Node *rhs) {
   Node *node = node_loc(file, line, NK_MULT);
   node->as.binop.lhs = lhs;
   node->as.binop.rhs = rhs;
+  return node;
+}
+
+Node *node_boolean_loc(const char *file, int line, bool boolean) {
+  Node *node = node_loc(file, line, NK_BOOLEAN);
+  node->as.boolean = boolean;
   return node;
 }
 
