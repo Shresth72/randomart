@@ -1,53 +1,44 @@
 #include "node.h"
+#include <stdio.h>
+#include <stdlib.h>
 
 #define ARENA_IMPLEMENTATION
 #include "lib/arena.h"
 
 static Arena node_arena = {0};
 
-Node *node_number(float number) {
+Node *node_loc(const char *file, int line, Node_Kind kind) {
   Node *node = arena_alloc(&node_arena, sizeof(Node));
-  node->kind = NK_NUMBER;
+  node->kind = kind;
+  node->file = file;
+  node->line = line;
+
+  return node;
+}
+
+Node *node_number_loc(const char *file, int line, float number) {
+  Node *node = node_loc(file, line, NK_NUMBER);
   node->as.number = number;
-
   return node;
 }
 
-Node *node_x(void) {
-  Node *node = arena_alloc(&node_arena, sizeof(Node));
-  node->kind = NK_X;
-
-  return node;
-}
-
-Node *node_y(void) {
-  Node *node = arena_alloc(&node_arena, sizeof(Node));
-  node->kind = NK_Y;
-
-  return node;
-}
-
-Node *node_add(Node *lhs, Node *rhs) {
-  Node *node = arena_alloc(&node_arena, sizeof(Node));
-  node->kind = NK_ADD;
+Node *node_add_loc(const char *file, int line, Node *lhs, Node *rhs) {
+  Node *node = node_loc(file, line, NK_ADD);
   node->as.binop.lhs = lhs;
   node->as.binop.rhs = rhs;
-
   return node;
 }
 
-Node *node_mult(Node *lhs, Node *rhs) {
-  Node *node = arena_alloc(&node_arena, sizeof(Node));
-  node->kind = NK_MULT;
+Node *node_mult_loc(const char *file, int line, Node *lhs, Node *rhs) {
+  Node *node = node_loc(file, line, NK_MULT);
   node->as.binop.lhs = lhs;
   node->as.binop.rhs = rhs;
-
   return node;
 }
 
-Node *node_triple(Node *first, Node *second, Node *third) {
-  Node *node = arena_alloc(&node_arena, sizeof(Node));
-  node->kind = NK_TRIPLE;
+Node *node_triple_loc(const char *file, int line, Node *first, Node *second,
+                      Node *third) {
+  Node *node = node_loc(file, line, NK_TRIPLE);
   node->as.triple.first = first;
   node->as.triple.second = second;
   node->as.triple.third = third;
