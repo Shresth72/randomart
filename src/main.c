@@ -326,7 +326,7 @@ Node *simple_grammar() {
 
   GRAMMAR_PRINT_LN(grammar);
 
-  Node *f = gen_rule(grammar, e, 10);
+  Node *f = gen_rule(grammar, e, 20);
   if (!f) {
     fprintf(stderr, "ERROR: Process could not terminate\n");
     exit(69);
