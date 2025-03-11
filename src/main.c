@@ -1,6 +1,5 @@
 #include "grammar.h"
 #include "node.h"
-#include <stdio.h>
 
 #define NOB_IMPLEMENTATION
 #define NOB_STRIP_PREFIX
@@ -17,6 +16,7 @@
 
 #define WIDTH 400
 #define HEIGHT 400
+#define GEN_RULE_MAX_ATTEMPTS 10
 
 typedef struct {
   uint8_t r;
@@ -218,21 +218,37 @@ Node *gen_node(Grammar grammar, Node *node, int depth) {
   case NK_MOD:
   case NK_GT: {
     Node *lhs = gen_node(grammar, node->as.binop.lhs, depth);
+    if (!lhs)
+      return NULL;
     Node *rhs = gen_node(grammar, node->as.binop.rhs, depth);
+    if (!rhs)
+      return NULL;
     return node_binop_loc(node->file, node->line, node->kind, lhs, rhs);
   }
 
   case NK_TRIPLE: {
     Node *first = gen_node(grammar, node->as.triple.first, depth);
+    if (!first)
+      return NULL;
     Node *second = gen_node(grammar, node->as.triple.second, depth);
+    if (!second)
+      return NULL;
     Node *third = gen_node(grammar, node->as.triple.third, depth);
+    if (!third)
+      return NULL;
     return node_triple_loc(node->file, node->line, first, second, third);
   }
 
   case NK_IF: {
     Node *cond = gen_node(grammar, node->as.iff.cond, depth);
+    if (!cond)
+      return NULL;
     Node *then = gen_node(grammar, node->as.iff.then, depth);
+    if (!then)
+      return NULL;
     Node *elze = gen_node(grammar, node->as.iff.elze, depth);
+    if (!elze)
+      return NULL;
     return node_if_loc(node->file, node->line, cond, then, elze);
   }
 
@@ -250,37 +266,6 @@ Node *gen_node(Grammar grammar, Node *node, int depth) {
   }
 }
 
-bool node_is_terminal(Node *node) {
-  switch (node->kind) {
-  case NK_X:
-    break;
-  case NK_Y:
-    break;
-  case NK_NUMBER:
-    break;
-  case NK_BOOLEAN:
-    break;
-  case NK_ADD:
-    break;
-  case NK_MULT:
-    break;
-  case NK_MOD:
-    break;
-  case NK_GT:
-    break;
-  case NK_TRIPLE:
-    break;
-  case NK_IF:
-    break;
-  case NK_RULE:
-    break;
-  case NK_RANDOM:
-    break;
-  case COUNT_NK:
-    break;
-  }
-}
-
 Node *gen_rule(Grammar grammar, size_t rule, int depth) {
   if (depth <= 0)
     return NULL;
@@ -290,17 +275,29 @@ Node *gen_rule(Grammar grammar, size_t rule, int depth) {
   Grammar_Branches *branches = &grammar.items[rule];
   assert(branches->count > 0);
 
-  size_t index = rand() % branches->count;
-  Node *random_branch = branches->items[index].node;
+  Node *node = NULL;
+  for (size_t attempts = 0; node == NULL && attempts < GEN_RULE_MAX_ATTEMPTS;
+       ++attempts) {
+    float p = rand_float();
+    float t = 0.0f;
+    for (size_t i = 0; i < branches->count; ++i) {
+      t += branches->items[i].probability;
+      if (t >= p) {
+        node = gen_node(grammar, branches->items[i].node, depth - 1);
+        break;
+      }
+    }
+  }
 
-  return gen_node(grammar, random_branch, depth);
+  return node;
 }
 
 // Grammar:
 // E ::= (C, C, C) ^ (1, 1),
 // A ::=〈random number ∈ [-1, 1]〉^ (1/3) | x ^ (1/3) | y ^ (1/3),
 // C ::= A ^ (1/4) | add(C, C) ^ (3/8) | multi(C, C) ^ (3/8)
-void simple_grammar() {
+Node *simple_grammar() {
+  srand(time(0));
   Grammar grammar = {0};
   Grammar_Branches branches = {0};
   size_t e = 0;
@@ -329,15 +326,20 @@ void simple_grammar() {
 
   GRAMMAR_PRINT_LN(grammar);
 
-  // Node *f = gen_rule(grammar, e, 3);
-  // NODE_PRINT_LN(f);
+  Node *f = gen_rule(grammar, e, 10);
+  if (!f) {
+    fprintf(stderr, "ERROR: Process could not terminate\n");
+    exit(69);
+  }
+  NODE_PRINT_LN(f);
+
+  return f;
 }
 
 int main() {
-  simple_grammar();
-
-  bool ok = render_pixels(gray_gradient_ast());
+  // bool ok = render_pixels(gray_gradient_ast());
   // bool ok = render_pixels(cool_gradient_ast());
+  bool ok = render_pixels(simple_grammar());
   if (!ok)
     return 1;
 
