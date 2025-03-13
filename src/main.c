@@ -5,43 +5,17 @@
 #define NOB_STRIP_PREFIX
 #include "lib/nob.h"
 
-#define STB_IMAGE_IMPLEMENTATION
-#include "lib/stb_image.h"
-
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "lib/stb_image_write.h"
-
 #define ARENA_IMPLEMENTATION
 #include "lib/arena.h"
 
+#define WINDOW_WIDTH 800
+#define WINDOW_HEIGHT 600
 #define WIDTH 400
 #define HEIGHT 400
 #define GEN_RULE_MAX_ATTEMPTS 10
 
-typedef struct {
-  uint8_t r;
-  uint8_t g;
-  uint8_t b;
-  uint8_t a;
-} RGBA32;
-
-typedef struct {
-  float r, g, b;
-} Color;
-
 static Arena node_arena = {0};
-static RGBA32 pixels[WIDTH * HEIGHT];
-
-static_assert(COUNT_NK == 12, "Amount of nodes have changed");
-const char *nk_names[COUNT_NK] = {
-    [NK_X] = "x",           [NK_Y] = "y",
-    [NK_NUMBER] = "number", [NK_BOOLEAN] = "boolean",
-    [NK_ADD] = "add",       [NK_MULT] = "mult",
-    [NK_MOD] = "mod",       [NK_GT] = "gt",
-    [NK_TRIPLE] = "triple", [NK_IF] = "if",
-
-    [NK_RULE] = "rule",     [NK_RANDOM] = "random",
-};
+static Color pixels[WIDTH * HEIGHT];
 
 // Arena allocator for 'Node' in node_arena
 Node *node_loc(const char *file, int line, Node_Kind kind) {
@@ -138,14 +112,13 @@ Node *eval(Node *expr, float x, float y) {
            expr->file, expr->line);
     return NULL;
 
-  case COUNT_NK:
   default:
     UNREACHABLE_CODE("eval");
   }
 }
 
 /// Evaluate and assign triple/colors to each pixel
-bool eval_func(Node *f, float x, float y, Color *c) {
+bool eval_func(Node *f, float x, float y, Vector3 *c) {
   Node *result = eval(f, x, y);
 
   if (!result || !expect_kind(result, NK_TRIPLE))
@@ -155,9 +128,9 @@ bool eval_func(Node *f, float x, float y, Color *c) {
       !expect_kind(result->as.triple.third, NK_NUMBER))
     return false;
 
-  c->r = result->as.triple.first->as.number;
-  c->g = result->as.triple.second->as.number;
-  c->b = result->as.triple.third->as.number;
+  c->x = result->as.triple.first->as.number;
+  c->y = result->as.triple.second->as.number;
+  c->z = result->as.triple.third->as.number;
   return true;
 }
 
@@ -169,14 +142,14 @@ bool render_pixels(Node *f) {
     for (size_t x = 0; x < WIDTH; ++x) {
       float nx = (float)x / WIDTH * 2.0f - 1;
 
-      Color c;
+      Vector3 c;
       if (!eval_func(f, nx, ny, &c))
         return false;
 
       size_t index = y * WIDTH + x;
-      pixels[index].r = (c.r + 1) / 2 * 255;
-      pixels[index].g = (c.g + 1) / 2 * 255;
-      pixels[index].b = (c.b + 1) / 2 * 255;
+      pixels[index].r = (c.x + 1) / 2 * 255;
+      pixels[index].g = (c.y + 1) / 2 * 255;
+      pixels[index].b = (c.z + 1) / 2 * 255;
       pixels[index].a = 255;
     }
   }
@@ -260,7 +233,6 @@ Node *gen_node(Grammar grammar, Node *node, int depth) {
     return node_number_loc(node->file, node->line, rand_float() * 2.0f - 1.0f);
   }
 
-  case COUNT_NK:
   default:
     UNREACHABLE_CODE("gen_node");
   }
@@ -296,9 +268,7 @@ Node *gen_rule(Grammar grammar, size_t rule, int depth) {
 // E ::= (C, C, C) ^ (1, 1),
 // A ::=〈random number ∈ [-1, 1]〉^ (1/3) | x ^ (1/3) | y ^ (1/3),
 // C ::= A ^ (1/4) | add(C, C) ^ (3/8) | multi(C, C) ^ (3/8)
-Node *simple_grammar() {
-  srand(time(0));
-  Grammar grammar = {0};
+int simple_grammar(Grammar *grammar) {
   Grammar_Branches branches = {0};
   size_t e = 0;
   int a = 1;
@@ -307,50 +277,77 @@ Node *simple_grammar() {
   // E
   append_branch(&branches,
                 node_triple(node_rule(c), node_rule(c), node_rule(c)), 1.f);
-  arena_da_append(&node_arena, &grammar, branches);
+  arena_da_append(&node_arena, grammar, branches);
   memset(&branches, 0, sizeof(branches));
 
   // A
   append_branch(&branches, node_random(), 1.f / 3.f);
   append_branch(&branches, node_x(), 1.f / 3.f);
   append_branch(&branches, node_y(), 1.f / 3.f);
-  arena_da_append(&node_arena, &grammar, branches);
+  arena_da_append(&node_arena, grammar, branches);
   memset(&branches, 0, sizeof(branches));
 
   // C
   append_branch(&branches, node_rule(a), 1.f / 4.f);
   append_branch(&branches, node_add(node_rule(c), node_rule(c)), 3.f / 8.f);
   append_branch(&branches, node_mult(node_rule(c), node_rule(c)), 3.f / 8.f);
-  arena_da_append(&node_arena, &grammar, branches);
+  arena_da_append(&node_arena, grammar, branches);
   memset(&branches, 0, sizeof(branches));
 
-  GRAMMAR_PRINT_LN(grammar);
-
-  Node *f = gen_rule(grammar, e, 20);
-  if (!f) {
-    fprintf(stderr, "ERROR: Process could not terminate\n");
-    exit(69);
-  }
-  NODE_PRINT_LN(f);
-
-  return f;
+  GRAMMAR_PRINT_LN(*grammar);
+  return e;
 }
 
-int main() {
-  // bool ok = render_pixels(gray_gradient_ast());
-  // bool ok = render_pixels(cool_gradient_ast());
-  bool ok = render_pixels(simple_grammar());
-  if (!ok)
-    return 1;
+int main(int argc, char **argv) {
+  srand(time(0));
 
-  const char *output_path = "output/output_path.png";
-  if (!stbi_write_png(output_path, WIDTH, HEIGHT, 4, pixels,
-                      WIDTH * sizeof(RGBA32))) {
-    nob_log(ERROR, "Could not save image: %s", output_path);
+  const char *program_name = shift(argv, argc);
+  if (argc <= 0) {
+    nob_log(ERROR, "Usage: %s <command>\n", program_name);
+    nob_log(ERROR, "No command is provided\n");
     return 1;
   }
 
-  nob_log(INFO, "Generated: %s", output_path);
+  const char *command_name = shift(argv, argc);
+  if (strcmp(command_name, "file") == 0) {
+    if (argc <= 0) {
+      nob_log(ERROR, "Usage: %s %s <output_path>", program_name, command_name);
+      nob_log(ERROR, "No output path is provided");
+      return 1;
+    }
+    const char *output_path = shift(argv, argc);
 
+    // Node *f = gray_gradient_ast();
+    // Node* f = cool_gradient_ast();
+
+    Grammar grammar = {0};
+    int entry = simple_grammar(&grammar);
+
+    Node *f = gen_rule(grammar, entry, 10);
+    if (!f) {
+      nob_log(ERROR, "Process could not terminate\n");
+      exit(69);
+    }
+    NODE_PRINT_LN(f);
+
+    bool ok = render_pixels(f);
+    if (!ok)
+      return 1;
+
+    if (!stbi_write_png(output_path, WIDTH, HEIGHT, 4, pixels,
+                        WIDTH * sizeof(Color))) {
+      nob_log(ERROR, "Could not save image: %s", output_path);
+      return 1;
+    }
+
+    nob_log(INFO, "Generated: %s", output_path);
+    return 0;
+  }
+
+  if (strcmp(command_name, "gui") == 0) {
+    InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "RandomArt");
+  }
+
+  nob_log(ERROR, "Unknown command: %s", command_name);
   return 0;
 }

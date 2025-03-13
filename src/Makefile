@@ -1,6 +1,9 @@
 run:
 	./nob run
 
+gui:
+	./nob gui
+
 compile:
 	./nob
 

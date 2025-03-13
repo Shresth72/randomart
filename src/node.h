@@ -5,6 +5,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+// #include <raylib.h>
+
+#include "lib/raylib/raylib-5.5_linux_amd64/include/raylib.h"
+#include "lib/stb_image.h"
+#include "lib/stb_image_write.h"
 
 typedef struct Node Node;
 
@@ -28,7 +33,6 @@ typedef enum {
   // Rule (ref to another grammar rule index)
   NK_RULE,
   NK_RANDOM,
-  COUNT_NK,
 } Node_Kind;
 
 #define node_kind_string(kind)                                                 \

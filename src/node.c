@@ -121,7 +121,6 @@ void node_print(Node *node) {
     printf("%s", node_kind_string(node->kind));
     break;
 
-  case COUNT_NK:
   default:
     UNREACHABLE_CODE("node_print");
     return;
