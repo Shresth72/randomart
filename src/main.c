@@ -34,34 +34,6 @@ void append_branch(Grammar_Branches *branches, Node *node, float probability) {
                   ((Grammar_Branch){.node = node, .probability = probability}));
 }
 
-// Macro Mapper for binary operations
-#define BINOP_MAPPER(kind, lhs, rhs)                                           \
-  ((kind) == NK_ADD    ? ((lhs) + (rhs))                                       \
-   : (kind) == NK_MULT ? ((lhs) * (rhs))                                       \
-   : (kind) == NK_MOD  ? fmodf((lhs), (rhs))                                   \
-   : (kind) == NK_GT   ? ((lhs) > (rhs))                                       \
-                       : 0)
-/// Evaluate Binary Operations
-Node *eval_binop(Node *expr, float x, float y, Node_Kind kind) {
-  Node *lhs = eval(expr->as.binop.lhs, x, y);
-  if (!lhs || !expect_kind(lhs, kind))
-    return NULL;
-
-  Node *rhs = eval(expr->as.binop.rhs, x, y);
-  if (!rhs || !expect_kind(rhs, kind))
-    return NULL;
-
-  if (expr->kind == NK_GT) {
-    return node_boolean_loc(
-        expr->file, expr->line,
-        BINOP_MAPPER(expr->kind, lhs->as.number, rhs->as.number));
-  }
-
-  return node_number_loc(
-      expr->file, expr->line,
-      BINOP_MAPPER(expr->kind, lhs->as.number, rhs->as.number));
-}
-
 /// Evaluate Node Expressions (AST)
 Node *eval(Node *expr, float x, float y) {
   switch (expr->kind) {
@@ -80,6 +52,9 @@ Node *eval(Node *expr, float x, float y) {
   case NK_MOD:
   case NK_GT:
     return eval_binop(expr, x, y, NK_NUMBER);
+
+  case NK_SQRT:
+    return eval_unop(expr, x, y, NK_NUMBER);
 
   case NK_TRIPLE: {
     Node *first = eval(expr->as.triple.first, x, y);
@@ -202,6 +177,13 @@ Node *gen_node(Grammar grammar, Node *node, int depth) {
     return node_binop_loc(node->file, node->line, node->kind, lhs, rhs);
   }
 
+  case NK_SQRT: {
+    Node *value = gen_node(grammar, node->as.unop, depth);
+    if (!value)
+      return NULL;
+    return node_unop_loc(node->file, node->line, value);
+  }
+
   case NK_TRIPLE: {
     Node *first = gen_node(grammar, node->as.triple.first, depth);
     if (!first)
@@ -311,7 +293,111 @@ Texture GetDefaultTexture() {
   };
 }
 
-void compile_node_func_into_fragment_shader(String_Builder *sb, Node *f) {}
+bool compile_node_func_into_fragment_expression(String_Builder *sb,
+                                                Node *expr) {
+  switch (expr->kind) {
+  case NK_X:
+    sb_append_cstr(sb, "x");
+    break;
+  case NK_Y:
+    sb_append_cstr(sb, "y");
+    break;
+
+  case NK_NUMBER: {
+    size_t checkpoint = nob_temp_save();
+    sb_append_cstr(sb, temp_sprintf("%f", expr->as.number));
+    nob_temp_rewind(checkpoint);
+  } break;
+
+  case NK_BOOLEAN:
+    sb_append_cstr(sb, expr->as.boolean ? "true" : "false");
+    break;
+
+  case NK_ADD:
+  case NK_MULT:
+  case NK_GT:
+    sb_append_cstr(sb, "(");
+    if (!compile_node_func_into_fragment_expression(sb, expr->as.binop.lhs))
+      return false;
+    sb_append_cstr(sb, node_kind_operation(expr->kind));
+    if (!compile_node_func_into_fragment_expression(sb, expr->as.binop.rhs))
+      return false;
+    sb_append_cstr(sb, ")");
+    break;
+
+  case NK_MOD:
+    sb_append_cstr(sb, "mod(");
+    if (!compile_node_func_into_fragment_expression(sb, expr->as.binop.lhs))
+      return false;
+    sb_append_cstr(sb, ",");
+    if (!compile_node_func_into_fragment_expression(sb, expr->as.binop.rhs))
+      return false;
+    sb_append_cstr(sb, ")");
+    break;
+
+  case NK_SQRT:
+    sb_append_cstr(sb, "sqrt(");
+    if (!compile_node_func_into_fragment_expression(sb, expr->as.unop))
+      return false;
+    sb_append_cstr(sb, ")");
+    break;
+
+  case NK_TRIPLE:
+    sb_append_cstr(sb, "vec4(");
+    if (!compile_node_func_into_fragment_expression(sb, expr->as.triple.first))
+      return false;
+    sb_append_cstr(sb, ",");
+    if (!compile_node_func_into_fragment_expression(sb, expr->as.triple.second))
+      return false;
+    sb_append_cstr(sb, ",");
+    if (!compile_node_func_into_fragment_expression(sb, expr->as.triple.third))
+      return false;
+    sb_append_cstr(sb, ", 1)");
+    break;
+
+  case NK_IF:
+    sb_append_cstr(sb, "(");
+    if (!compile_node_func_into_fragment_expression(sb, expr->as.iff.cond))
+      return false;
+    sb_append_cstr(sb, "?");
+    if (!compile_node_func_into_fragment_expression(sb, expr->as.iff.then))
+      return false;
+    sb_append_cstr(sb, ":");
+    if (!compile_node_func_into_fragment_expression(sb, expr->as.iff.elze))
+      return false;
+    sb_append_cstr(sb, ")");
+    break;
+
+  case NK_RULE:
+  case NK_RANDOM:
+    printf("%s:%d: ERROR: cannot compile a node that is only valid for grammar "
+           "definitions\n",
+           expr->file, expr->line);
+    return false;
+
+  default:
+    UNREACHABLE_CODE("compile_node_func_into_fragment_expression");
+  }
+
+  return true;
+}
+
+bool compile_node_func_into_fragment_shader(String_Builder *sb, Node *f) {
+  sb_append_cstr(sb, "#version 330\n");
+  sb_append_cstr(sb, "in vec2 fragTexCoord;\n");
+  sb_append_cstr(sb, "out vec4 finalColor;\n");
+  sb_append_cstr(sb, "void main() {\n");
+
+  sb_append_cstr(sb, "  float x = fragTexCoord.x;\n");
+  sb_append_cstr(sb, "  float y = fragTexCoord.y;\n");
+  sb_append_cstr(sb, "  finalColor = ");
+  if (!compile_node_func_into_fragment_expression(sb, f))
+    return false;
+
+  sb_append_cstr(sb, ";\n");
+  sb_append_cstr(sb, "}\n");
+  return true;
+}
 
 int main(int argc, char **argv) {
   srand(time(0));
@@ -356,12 +442,21 @@ int main(int argc, char **argv) {
   if (strcmp(command_name, "gui") == 0) {
     InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "RandomArt");
 
-    const char *vs_shader = "#version 330\n"
-                            "in vec3 vertexPosition;\n"
-                            "uniform mat4 mvp;\n"
-                            "void main() {\n"
-                            "  gl_Position = mvp*vec4(vertexPosition, 1.0);\n"
-                            "}\n";
+    Grammar grammar = {0};
+    int entry = simple_grammar(&grammar);
+    Node *f = gen_rule(grammar, entry, GRAMMAR_DEPTH);
+    if (!f) {
+      nob_log(ERROR, "Process could not terminate\n");
+      exit(69);
+    }
+    NODE_PRINT_LN(f);
+
+    String_Builder sb = {0};
+    if (!compile_node_func_into_fragment_shader(&sb, f))
+      return 1;
+    sb_append_null(&sb);
+    printf("%s", sb.items);
+
     const char *fs_shader =
         "#version 330\n"
         "in vec2 fragTexCoord;\n"
@@ -369,19 +464,21 @@ int main(int argc, char **argv) {
         "void main() {\n"
         "  finalColor = vec4(fragTexCoord.x, fragTexCoord.y, 0, 1);\n"
         "}\n";
-    Shader shader = LoadShaderFromMemory(NULL, fs_shader);
+
+    Shader shader = LoadShaderFromMemory(NULL, sb.items);
     Texture default_texture = GetDefaultTexture();
 
     SetTargetFPS(60);
     while (!WindowShouldClose()) {
       BeginDrawing();
-      int size = 300;
 
+      int size = 300;
       BeginShaderMode(shader);
-      DrawTextureEx(default_texture, (Vector2){0, 0}, 0, 300, RED);
+      DrawTextureEx(default_texture, (Vector2){0, 0}, 0, size, RED);
       // DrawRectangle((GetScreenWidth() - size) / 2,
       //               (GetScreenHeight() - size) / 2, size, size, RED);
       EndShaderMode();
+
       EndDrawing();
     }
     return 0;

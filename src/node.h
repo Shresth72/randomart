@@ -6,6 +6,7 @@
 #include <string.h>
 #include <time.h>
 // #include <raylib.h>
+// #include <rlgl.h>
 
 #include "lib/raylib/raylib-5.5_linux_amd64/include/raylib.h"
 #include "lib/raylib/raylib-5.5_linux_amd64/include/rlgl.h"
@@ -18,6 +19,7 @@ typedef enum {
   NK_Y,
   NK_NUMBER,
   NK_BOOLEAN,
+  NK_SQRT,
 
   // Binary Operations
   NK_ADD,
@@ -42,12 +44,20 @@ typedef enum {
    : (kind) == NK_MULT    ? "mult"                                             \
    : (kind) == NK_MOD     ? "mod"                                              \
    : (kind) == NK_BOOLEAN ? "boolean"                                          \
+   : (kind) == NK_SQRT    ? "sqrt"                                             \
    : (kind) == NK_GT      ? "gt"                                               \
    : (kind) == NK_TRIPLE  ? "triple"                                           \
    : (kind) == NK_IF      ? "if"                                               \
    : (kind) == NK_RULE    ? "rule"                                             \
    : (kind) == NK_RANDOM  ? "random"                                           \
                           : "unknown")
+
+#define node_kind_operation(kind)                                              \
+  ((kind) == NK_ADD    ? "+"                                                   \
+   : (kind) == NK_MULT ? "*"                                                   \
+   : (kind) == NK_MOD  ? "%"                                                   \
+   : (kind) == NK_GT   ? ">"                                                   \
+                       : "unknown")
 
 typedef struct {
   Node *lhs;
@@ -69,8 +79,9 @@ typedef struct {
 typedef union {
   float number;
   bool boolean;
-  Node_Binop binop;
 
+  Node *unop;
+  Node_Binop binop;
   Node_Triple triple;
   Node_If iff;
 
@@ -87,6 +98,7 @@ struct Node {
 // MAIN FUNCTIONS
 Node *eval(Node *expr, float x, float y);
 Node *eval_binop(Node *expr, float x, float y, Node_Kind kind);
+Node *eval_unop(Node *expr, float x, float y, Node_Kind kind);
 bool render_pixels(Image image, Node *f);
 
 // GRADIENTS
@@ -104,6 +116,7 @@ Node *node_number_loc(const char *file, int line, float number);
 Node *node_boolean_loc(const char *file, int line, bool boolean);
 Node *node_rule_loc(const char *file, int line, int rule);
 
+Node *node_unop_loc(const char *file, int line, Node *value);
 Node *node_binop_loc(const char *file, int line, Node_Kind kind, Node *lhs,
                      Node *rhs);
 Node *node_add_loc(const char *file, int line, Node *lhs, Node *rhs);

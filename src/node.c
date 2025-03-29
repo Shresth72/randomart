@@ -1,4 +1,5 @@
 #include "node.h"
+#include <stdio.h>
 
 // Node Kind Allocator
 Node *node_number_loc(const char *file, int line, float number) {
@@ -16,6 +17,12 @@ Node *node_rule_loc(const char *file, int line, int rule) {
 Node *node_boolean_loc(const char *file, int line, bool boolean) {
   Node *node = node_loc(file, line, NK_BOOLEAN);
   node->as.boolean = boolean;
+  return node;
+}
+
+Node *node_unop_loc(const char *file, int line, Node *value) {
+  Node *node = node_loc(file, line, NK_SQRT);
+  node->as.unop = value;
   return node;
 }
 
@@ -69,6 +76,42 @@ bool expect_kind(Node *expr, Node_Kind kind) {
   return true;
 }
 
+// Macro Mapper for binary operations
+#define BINOP_MAPPER(kind, lhs, rhs)                                           \
+  ((kind) == NK_ADD    ? ((lhs) + (rhs))                                       \
+   : (kind) == NK_MULT ? ((lhs) * (rhs))                                       \
+   : (kind) == NK_MOD  ? fmodf((lhs), (rhs))                                   \
+   : (kind) == NK_GT   ? ((lhs) > (rhs))                                       \
+                       : 0)
+/// Evaluate Binary Operations
+Node *eval_binop(Node *expr, float x, float y, Node_Kind kind) {
+  Node *lhs = eval(expr->as.binop.lhs, x, y);
+  if (!lhs || !expect_kind(lhs, kind))
+    return NULL;
+
+  Node *rhs = eval(expr->as.binop.rhs, x, y);
+  if (!rhs || !expect_kind(rhs, kind))
+    return NULL;
+
+  if (expr->kind == NK_GT) {
+    return node_boolean_loc(
+        expr->file, expr->line,
+        BINOP_MAPPER(expr->kind, lhs->as.number, rhs->as.number));
+  }
+
+  return node_number_loc(
+      expr->file, expr->line,
+      BINOP_MAPPER(expr->kind, lhs->as.number, rhs->as.number));
+}
+
+Node *eval_unop(Node *expr, float x, float y, Node_Kind kind) {
+  Node *value = eval(expr->as.unop, x, y);
+  if (!value || !expect_kind(value, kind))
+    return NULL;
+
+  return node_number_loc(expr->file, expr->line, sqrt(value->as.number));
+}
+
 void node_print(Node *node) {
   switch (node->kind) {
   case NK_X:
@@ -92,6 +135,12 @@ void node_print(Node *node) {
     node_print(node->as.binop.lhs);
     printf(", ");
     node_print(node->as.binop.rhs);
+    printf(")");
+    break;
+
+  case NK_SQRT:
+    printf("sqrt(");
+    node_print(node->as.unop);
     printf(")");
     break;
 
