@@ -8,8 +8,6 @@
 // #include <raylib.h>
 
 #include "lib/raylib/raylib-5.5_linux_amd64/include/raylib.h"
-#include "lib/stb_image.h"
-#include "lib/stb_image_write.h"
 
 typedef struct Node Node;
 
@@ -88,7 +86,7 @@ struct Node {
 // MAIN FUNCTIONS
 Node *eval(Node *expr, float x, float y);
 Node *eval_binop(Node *expr, float x, float y, Node_Kind kind);
-bool render_pixels(Node *f);
+bool render_pixels(Image image, Node *f);
 
 // GRADIENTS
 Node *gray_gradient_ast();

@@ -5,11 +5,11 @@ void grammar_print(Grammar grammar) {
     printf("%zu ::= ", i);
     Grammar_Branches *branches = &grammar.items[i];
     for (size_t j = 0; j < branches->count; ++j) {
-      if (j > 0) printf(" | ");
+      if (j > 0)
+        printf(" | ");
       node_print(branches->items[j].node);
       printf(" [%.02f]", branches->items[i].probability);
     }
     printf("\n");
   }
 }
-

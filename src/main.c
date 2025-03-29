@@ -1,4 +1,5 @@
 #include "grammar.h"
+#include "lib/raylib/raylib-5.5_linux_amd64/include/raylib.h"
 #include "node.h"
 
 #define NOB_IMPLEMENTATION
@@ -13,9 +14,10 @@
 #define WIDTH 400
 #define HEIGHT 400
 #define GEN_RULE_MAX_ATTEMPTS 10
+#define GRAMMAR_DEPTH 10
 
 static Arena node_arena = {0};
-static Color pixels[WIDTH * HEIGHT];
+// static Color pixels[WIDTH * HEIGHT];
 
 // Arena allocator for 'Node' in node_arena
 Node *node_loc(const char *file, int line, Node_Kind kind) {
@@ -135,7 +137,9 @@ bool eval_func(Node *f, float x, float y, Vector3 *c) {
 }
 
 /// Render the evaluated pixel values from the ast
-bool render_pixels(Node *f) {
+bool render_pixels(Image image, Node *f) {
+  Color *pixels = image.data;
+
   for (size_t y = 0; y < HEIGHT; ++y) {
     // 0..<HEIGHT => 0..1 => 0..2 => -1..1
     float ny = (float)y / HEIGHT * 2.0f - 1;
@@ -319,33 +323,47 @@ int main(int argc, char **argv) {
 
     // Node *f = gray_gradient_ast();
     // Node* f = cool_gradient_ast();
-
     Grammar grammar = {0};
     int entry = simple_grammar(&grammar);
-
-    Node *f = gen_rule(grammar, entry, 10);
+    Node *f = gen_rule(grammar, entry, GRAMMAR_DEPTH);
     if (!f) {
       nob_log(ERROR, "Process could not terminate\n");
       exit(69);
     }
+
     NODE_PRINT_LN(f);
 
-    bool ok = render_pixels(f);
-    if (!ok)
+    Image image = GenImageColor(WIDTH, HEIGHT, BLANK);
+    if (!render_pixels(image, f))
+      return 1;
+    if (!ExportImage(image, output_path))
       return 1;
 
-    if (!stbi_write_png(output_path, WIDTH, HEIGHT, 4, pixels,
-                        WIDTH * sizeof(Color))) {
-      nob_log(ERROR, "Could not save image: %s", output_path);
-      return 1;
-    }
-
-    nob_log(INFO, "Generated: %s", output_path);
     return 0;
   }
 
   if (strcmp(command_name, "gui") == 0) {
     InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "RandomArt");
+
+    const char *fs_shader = "#version 330\n"
+                            "in vec2 fragTextCoord;\n"
+                            "out vec4 finalColor;\n"
+                            "void main() {\n"
+                            "  finalColor = vec4(0, 1, 0, 1);\n"
+                            "}\n";
+    Shader shader = LoadShaderFromMemory(NULL, fs_shader);
+
+    SetTargetFPS(60);
+    while (!WindowShouldClose()) {
+      BeginDrawing();
+      int size = 300;
+      BeginShaderMode(shader);
+      DrawRectangle((GetScreenWidth() - size) / 2,
+                    (GetScreenHeight() - size) / 2, size, size, RED);
+      EndShaderMode();
+      EndDrawing();
+    }
+    return 0;
   }
 
   nob_log(ERROR, "Unknown command: %s", command_name);

@@ -3,8 +3,6 @@
 #define NOB_STRIP_PREFIX
 #include "lib/nob.h"
 
-#define BUILD_FOLDER "build/"
-
 #define builder_cc(cmd) cmd_append(cmd, "cc")
 #define builder_output(cmd, output_path) cmd_append(cmd, "-o", output_path)
 #define builder_inputs(cmd, ...) cmd_append(cmd, __VA_ARGS__)
