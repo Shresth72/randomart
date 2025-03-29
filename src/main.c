@@ -1,5 +1,4 @@
 #include "grammar.h"
-#include "lib/raylib/raylib-5.5_linux_amd64/include/raylib.h"
 #include "node.h"
 
 #define NOB_IMPLEMENTATION
@@ -302,6 +301,18 @@ int simple_grammar(Grammar *grammar) {
   return e;
 }
 
+Texture GetDefaultTexture() {
+  return (Texture){
+      .id = rlGetTextureIdDefault(),
+      .width = 1,
+      .height = 1,
+      .mipmaps = 1,
+      .format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8,
+  };
+}
+
+void compile_node_func_into_fragment_shader(String_Builder *sb, Node *f) {}
+
 int main(int argc, char **argv) {
   srand(time(0));
 
@@ -345,21 +356,31 @@ int main(int argc, char **argv) {
   if (strcmp(command_name, "gui") == 0) {
     InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "RandomArt");
 
-    const char *fs_shader = "#version 330\n"
-                            "in vec2 fragTextCoord;\n"
-                            "out vec4 finalColor;\n"
+    const char *vs_shader = "#version 330\n"
+                            "in vec3 vertexPosition;\n"
+                            "uniform mat4 mvp;\n"
                             "void main() {\n"
-                            "  finalColor = vec4(0, 1, 0, 1);\n"
+                            "  gl_Position = mvp*vec4(vertexPosition, 1.0);\n"
                             "}\n";
+    const char *fs_shader =
+        "#version 330\n"
+        "in vec2 fragTexCoord;\n"
+        "out vec4 finalColor;\n"
+        "void main() {\n"
+        "  finalColor = vec4(fragTexCoord.x, fragTexCoord.y, 0, 1);\n"
+        "}\n";
     Shader shader = LoadShaderFromMemory(NULL, fs_shader);
+    Texture default_texture = GetDefaultTexture();
 
     SetTargetFPS(60);
     while (!WindowShouldClose()) {
       BeginDrawing();
       int size = 300;
+
       BeginShaderMode(shader);
-      DrawRectangle((GetScreenWidth() - size) / 2,
-                    (GetScreenHeight() - size) / 2, size, size, RED);
+      DrawTextureEx(default_texture, (Vector2){0, 0}, 0, 300, RED);
+      // DrawRectangle((GetScreenWidth() - size) / 2,
+      //               (GetScreenHeight() - size) / 2, size, size, RED);
       EndShaderMode();
       EndDrawing();
     }
