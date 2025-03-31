@@ -3,19 +3,31 @@
 #define NOB_STRIP_PREFIX
 #include "lib/nob.h"
 
+/* ---------- */
+#ifdef __linux__
+#define RAYLIB_PATH "./lib/raylib/raylib-5.5_linux_amd64"
+#elif defined(_WIN32) || defined(_WIN64)
+#define RAYLIB_PATH "./lib/raylib/raylib_windows"
+#elif defined(__APPLE__)
+#define RAYLIB_PATH "./lib/raylib/raylib_macos"
+#else
+#error "Unsupported platform"
+#endif
+/* ---------- */
+
 #define builder_cc(cmd) cmd_append(cmd, "cc")
 #define builder_output(cmd, output_path) cmd_append(cmd, "-o", output_path)
 #define builder_inputs(cmd, ...) cmd_append(cmd, __VA_ARGS__)
 #define builder_libs(cmd) cmd_append(cmd, "-lm")
-#define builder_flags(cmd) \
+#define builder_flags(cmd)                                                     \
   cmd_append(cmd, "-Wall", "-Wextra", "-Wswitch-enum", "-ggdb")
-#define builder_include_path(cmd, include_path) \
+#define builder_include_path(cmd, include_path)                                \
   cmd_append(cmd, temp_sprintf("-I%s", include_path))
 
-#define builder_raylib_include_path(cmd) \
-  cmd_append(cmd, "-I./lib/raylib/raylib-5.5_linux_amd64/include")
-#define builder_rayblib_library_path(cmd) \
-  cmd_append(cmd, "-L./lib/raylib/raylib-5.5_linux_amd64/lib", "-l:libraylib.a")
+#define builder_raylib_include_path(cmd)                                       \
+  cmd_append(cmd, temp_sprintf("-I%s/include", RAYLIB_PATH))
+#define builder_raylib_library_path(cmd)                                       \
+  cmd_append(cmd, temp_sprintf("-L%s/lib", RAYLIB_PATH), "-l:libraylib.a")
 
 int main(int argc, char *argv[]) {
   NOB_GO_REBUILD_URSELF(argc, argv);
@@ -28,7 +40,7 @@ int main(int argc, char *argv[]) {
   builder_libs(&cmd);
   builder_flags(&cmd);
   builder_raylib_include_path(&cmd);
-  builder_rayblib_library_path(&cmd);
+  builder_raylib_library_path(&cmd);
 
   if (!cmd_run_sync_and_reset(&cmd))
     return 1;
