@@ -98,9 +98,9 @@ struct Node {
 };
 
 // MAIN FUNCTIONS
-Node *eval(Node *expr, float x, float y);
-Node *eval_binop(Node *expr, float x, float y, Node_Kind kind);
-Node *eval_unop(Node *expr, float x, float y, Node_Kind kind);
+Node *eval(Node *expr, float x, float y, float t);
+Node *eval_binop(Node *expr, float x, float y, float t, Node_Kind kind);
+Node *eval_unop(Node *expr, float x, float y, float t, Node_Kind kind);
 bool render_pixels(Image image, Node *f);
 
 // GRADIENTS
@@ -143,6 +143,7 @@ Node *node_if_loc(const char *file, int line, Node *cond, Node *then,
 // GRAMMAR MACROS
 #define node_x() node_loc(__FILE__, __LINE__, NK_X)
 #define node_y() node_loc(__FILE__, __LINE__, NK_Y)
+#define node_t() node_loc(__FILE__, __LINE__, NK_T)
 #define node_random() node_loc(__FILE__, __LINE__, NK_RANDOM)
 
 #define node_number(number) node_number_loc(__FILE__, __LINE__, number)

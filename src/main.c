@@ -36,13 +36,14 @@ void append_branch(Grammar_Branches *branches, Node *node, float probability) {
 }
 
 /// Evaluate Node Expressions (AST)
-Node *eval(Node *expr, float x, float y) {
+Node *eval(Node *expr, float x, float y, float t) {
   switch (expr->kind) {
   case NK_X:
     return node_number_loc(expr->file, expr->line, x);
-
   case NK_Y:
     return node_number_loc(expr->file, expr->line, y);
+  case NK_T:
+    return node_number_loc(expr->file, expr->line, t);
 
   case NK_NUMBER:
   case NK_BOOLEAN:
@@ -52,30 +53,30 @@ Node *eval(Node *expr, float x, float y) {
   case NK_MULT:
   case NK_MOD:
   case NK_GT:
-    return eval_binop(expr, x, y, NK_NUMBER);
+    return eval_binop(expr, x, y, t, NK_NUMBER);
 
   case NK_SQRT:
-    return eval_unop(expr, x, y, NK_NUMBER);
+    return eval_unop(expr, x, y, t, NK_NUMBER);
 
   case NK_TRIPLE: {
-    Node *first = eval(expr->as.triple.first, x, y);
-    Node *second = eval(expr->as.triple.second, x, y);
-    Node *third = eval(expr->as.triple.third, x, y);
+    Node *first = eval(expr->as.triple.first, x, y, t);
+    Node *second = eval(expr->as.triple.second, x, y, t);
+    Node *third = eval(expr->as.triple.third, x, y, t);
     return (first && second && third)
                ? node_triple_loc(expr->file, expr->line, first, second, third)
                : NULL;
   }
 
   case NK_IF: {
-    Node *cond = eval(expr->as.iff.cond, x, y);
+    Node *cond = eval(expr->as.iff.cond, x, y, t);
     if (!cond || !expect_kind(cond, NK_BOOLEAN))
       return NULL;
 
-    Node *then = eval(expr->as.iff.then, x, y);
+    Node *then = eval(expr->as.iff.then, x, y, t);
     if (!then || !expect_kind(then, NK_TRIPLE))
       return NULL;
 
-    Node *elze = eval(expr->as.iff.elze, x, y);
+    Node *elze = eval(expr->as.iff.elze, x, y, t);
     if (!elze || !expect_kind(elze, NK_TRIPLE))
       return NULL;
 
@@ -95,8 +96,8 @@ Node *eval(Node *expr, float x, float y) {
 }
 
 /// Evaluate and assign triple/colors to each pixel
-bool eval_func(Node *f, float x, float y, Vector3 *c) {
-  Node *result = eval(f, x, y);
+bool eval_func(Node *f, float x, float y, float t, Vector3 *c) {
+  Node *result = eval(f, x, y, t);
 
   if (!result || !expect_kind(result, NK_TRIPLE))
     return false;
@@ -122,7 +123,7 @@ bool render_pixels(Image image, Node *f) {
       float nx = (float)x / WIDTH * 2.0f - 1;
 
       Vector3 c;
-      if (!eval_func(f, nx, ny, &c))
+      if (!eval_func(f, nx, ny, 0.0f, &c))
         return false;
 
       size_t index = y * WIDTH + x;
@@ -161,6 +162,7 @@ Node *gen_node(Grammar grammar, Node *node, int depth) {
   switch (node->kind) {
   case NK_X:
   case NK_Y:
+  case NK_T:
   case NK_NUMBER:
   case NK_BOOLEAN:
     return node;
@@ -267,9 +269,10 @@ int simple_grammar(Grammar *grammar) {
   memset(&branches, 0, sizeof(branches));
 
   // A
-  append_branch(&branches, node_random(), 1.f / 3.f);
-  append_branch(&branches, node_x(), 1.f / 3.f);
-  append_branch(&branches, node_y(), 1.f / 3.f);
+  append_branch(&branches, node_random(), 1.f / 4.f);
+  append_branch(&branches, node_x(), 1.f / 4.f);
+  append_branch(&branches, node_y(), 1.f / 4.f);
+  append_branch(&branches, node_t(), 1.f / 4.f);
   arena_da_append(&node_arena, grammar, branches);
   memset(&branches, 0, sizeof(branches));
 
@@ -298,10 +301,9 @@ bool compile_node_func_into_fragment_expression(String_Builder *sb,
                                                 Node *expr) {
   switch (expr->kind) {
   case NK_X:
-    sb_append_cstr(sb, "x");
-    break;
   case NK_Y:
-    sb_append_cstr(sb, "y");
+  case NK_T:
+    sb_append_cstr(sb, node_kind_string(expr->kind));
     break;
 
   case NK_NUMBER: {
@@ -387,6 +389,7 @@ bool compile_node_func_into_fragment_shader(String_Builder *sb, Node *f) {
   sb_append_cstr(sb, "#version 330\n");
   sb_append_cstr(sb, "in vec2 fragTexCoord;\n");
   sb_append_cstr(sb, "out vec4 finalColor;\n");
+  sb_append_cstr(sb, "uniform float time;\n");
 
   sb_append_cstr(sb, "vec4 map_color(vec3 rgb) {\n");
   sb_append_cstr(sb, "  return vec4((rgb + 1)/2.0, 1.0);\n");
@@ -395,6 +398,7 @@ bool compile_node_func_into_fragment_shader(String_Builder *sb, Node *f) {
   sb_append_cstr(sb, "void main() {\n");
   sb_append_cstr(sb, "  float x = fragTexCoord.x * 2.0 - 1.0;\n");
   sb_append_cstr(sb, "  float y = fragTexCoord.y * 2.0 - 1.0;\n");
+  sb_append_cstr(sb, "  float t = sin(time);\n");
   sb_append_cstr(sb, "  finalColor = map_color(");
   if (!compile_node_func_into_fragment_expression(sb, f))
     return false;
@@ -454,6 +458,7 @@ int main(int argc, char **argv) {
       nob_log(ERROR, "Process could not terminate\n");
       exit(69);
     }
+    // NODE_PRINT_LN(f);
 
     String_Builder sb = {0};
     if (!compile_node_func_into_fragment_shader(&sb, f))
@@ -462,13 +467,17 @@ int main(int argc, char **argv) {
     printf("%s", sb.items);
 
     Shader shader = LoadShaderFromMemory(NULL, sb.items);
+
+    int time_loc = GetShaderLocation(shader, "time");
     Texture default_texture = GetDefaultTexture();
 
     SetTargetFPS(60);
     while (!WindowShouldClose()) {
       BeginDrawing();
 
-      int size = 500;
+      float time = GetTime();
+      SetShaderValue(shader, time_loc, &time, SHADER_UNIFORM_FLOAT);
+
       BeginShaderMode(shader);
       DrawTexturePro(default_texture, (Rectangle){0, 0, 1, 1},
                      (Rectangle){0, 0, GetScreenWidth(), GetScreenHeight()},

@@ -1,5 +1,4 @@
 #include "node.h"
-#include <stdio.h>
 
 // Node Kind Allocator
 Node *node_number_loc(const char *file, int line, float number) {
@@ -84,12 +83,12 @@ bool expect_kind(Node *expr, Node_Kind kind) {
    : (kind) == NK_GT   ? ((lhs) > (rhs))                                       \
                        : 0)
 /// Evaluate Binary Operations
-Node *eval_binop(Node *expr, float x, float y, Node_Kind kind) {
-  Node *lhs = eval(expr->as.binop.lhs, x, y);
+Node *eval_binop(Node *expr, float x, float y, float t, Node_Kind kind) {
+  Node *lhs = eval(expr->as.binop.lhs, x, y, t);
   if (!lhs || !expect_kind(lhs, kind))
     return NULL;
 
-  Node *rhs = eval(expr->as.binop.rhs, x, y);
+  Node *rhs = eval(expr->as.binop.rhs, x, y, t);
   if (!rhs || !expect_kind(rhs, kind))
     return NULL;
 
@@ -104,8 +103,8 @@ Node *eval_binop(Node *expr, float x, float y, Node_Kind kind) {
       BINOP_MAPPER(expr->kind, lhs->as.number, rhs->as.number));
 }
 
-Node *eval_unop(Node *expr, float x, float y, Node_Kind kind) {
-  Node *value = eval(expr->as.unop, x, y);
+Node *eval_unop(Node *expr, float x, float y, float t, Node_Kind kind) {
+  Node *value = eval(expr->as.unop, x, y, t);
   if (!value || !expect_kind(value, kind))
     return NULL;
 
