@@ -119,6 +119,8 @@ Node *node_boolean_loc(const char *file, int line, bool boolean);
 Node *node_rule_loc(const char *file, int line, int rule);
 
 Node *node_unop_loc(const char *file, int line, Node *value);
+Node *node_sqrt_loc(const char *file, int line, Node *value);
+
 Node *node_binop_loc(const char *file, int line, Node_Kind kind, Node *lhs,
                      Node *rhs);
 Node *node_add_loc(const char *file, int line, Node *lhs, Node *rhs);
@@ -149,6 +151,8 @@ Node *node_if_loc(const char *file, int line, Node *cond, Node *then,
 #define node_number(number) node_number_loc(__FILE__, __LINE__, number)
 #define node_boolean(number) node_boolean_loc(__FILE__, __LINE__, boolean)
 #define node_rule(rule) node_rule_loc(__FILE__, __LINE__, rule)
+
+#define node_sqrt(value) node_unop_loc(__FILE__, __LINE__, value)
 
 #define node_add(lhs, rhs) node_add_loc(__FILE__, __LINE__, lhs, rhs)
 #define node_mult(lhs, rhs) node_mult_loc(__FILE__, __LINE__, lhs, rhs)

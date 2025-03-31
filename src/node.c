@@ -25,6 +25,14 @@ Node *node_unop_loc(const char *file, int line, Node *value) {
   return node;
 }
 
+#define NODE_UNOP_LOC(func_name, kind)                                         \
+  Node *func_name(const char *file, int line, Node *value) {                   \
+    Node *node = node_loc(file, line, kind);                                   \
+    node->as.unop = value;                                                     \
+    return node;                                                               \
+  }
+NODE_UNOP_LOC(node_sqrt_loc, NK_SQRT);
+
 Node *node_binop_loc(const char *file, int line, Node_Kind kind, Node *lhs,
                      Node *rhs) {
   Node *node = node_loc(file, line, kind);

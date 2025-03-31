@@ -14,7 +14,7 @@
 #define WIDTH 400
 #define HEIGHT 400
 #define GEN_RULE_MAX_ATTEMPTS 10
-#define GRAMMAR_DEPTH 10
+#define GRAMMAR_DEPTH 20
 
 static Arena node_arena = {0};
 // static Color pixels[WIDTH * HEIGHT];
@@ -269,10 +269,19 @@ int simple_grammar(Grammar *grammar) {
   memset(&branches, 0, sizeof(branches));
 
   // A
-  append_branch(&branches, node_random(), 1.f / 4.f);
-  append_branch(&branches, node_x(), 1.f / 4.f);
-  append_branch(&branches, node_y(), 1.f / 4.f);
-  append_branch(&branches, node_t(), 1.f / 4.f);
+  append_branch(&branches, node_random(), 1.f / 5.f);
+  append_branch(&branches, node_x(), 1.f / 5.f);
+  append_branch(&branches, node_y(), 1.f / 5.f);
+  append_branch(&branches, node_t(), 1.f / 5.f);
+  append_branch(&branches,
+                node_sqrt(                                 //
+                    node_add(                              //
+                        node_add(                          //
+                            node_mult(node_x(), node_x()), //
+                            node_mult(node_y(), node_y())  //
+                            ),
+                        node_mult(node_t(), node_t()))),
+                1.f / 5.f);
   arena_da_append(&node_arena, grammar, branches);
   memset(&branches, 0, sizeof(branches));
 
