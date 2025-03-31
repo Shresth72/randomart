@@ -7,14 +7,14 @@
 #define builder_output(cmd, output_path) cmd_append(cmd, "-o", output_path)
 #define builder_inputs(cmd, ...) cmd_append(cmd, __VA_ARGS__)
 #define builder_libs(cmd) cmd_append(cmd, "-lm")
-#define builder_flags(cmd)                                                     \
+#define builder_flags(cmd) \
   cmd_append(cmd, "-Wall", "-Wextra", "-Wswitch-enum", "-ggdb")
-#define builder_include_path(cmd, include_path)                                \
+#define builder_include_path(cmd, include_path) \
   cmd_append(cmd, temp_sprintf("-I%s", include_path))
 
-#define builder_raylib_include_path(cmd)                                       \
+#define builder_raylib_include_path(cmd) \
   cmd_append(cmd, "-I./lib/raylib/raylib-5.5_linux_amd64/include")
-#define builder_rayblib_library_path(cmd)                                      \
+#define builder_rayblib_library_path(cmd) \
   cmd_append(cmd, "-L./lib/raylib/raylib-5.5_linux_amd64/lib", "-l:libraylib.a")
 
 int main(int argc, char *argv[]) {

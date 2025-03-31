@@ -116,6 +116,7 @@ void node_print(Node *node) {
   switch (node->kind) {
   case NK_X:
   case NK_Y:
+  case NK_T:
     printf(node_kind_string(node->kind));
     break;
 

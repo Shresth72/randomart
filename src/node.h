@@ -17,6 +17,7 @@ typedef enum {
   // Types
   NK_X,
   NK_Y,
+  NK_T,
   NK_NUMBER,
   NK_BOOLEAN,
   NK_SQRT,
@@ -39,6 +40,7 @@ typedef enum {
 #define node_kind_string(kind)                                                 \
   ((kind) == NK_X         ? "x"                                                \
    : (kind) == NK_Y       ? "y"                                                \
+   : (kind) == NK_T       ? "t"                                                \
    : (kind) == NK_NUMBER  ? "number"                                           \
    : (kind) == NK_ADD     ? "add"                                              \
    : (kind) == NK_MULT    ? "mult"                                             \

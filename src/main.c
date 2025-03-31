@@ -1,4 +1,5 @@
 #include "grammar.h"
+#include "lib/raylib/raylib-5.5_linux_amd64/include/raylib.h"
 #include "node.h"
 
 #define NOB_IMPLEMENTATION
@@ -343,7 +344,7 @@ bool compile_node_func_into_fragment_expression(String_Builder *sb,
     break;
 
   case NK_TRIPLE:
-    sb_append_cstr(sb, "vec4(");
+    sb_append_cstr(sb, "vec3(");
     if (!compile_node_func_into_fragment_expression(sb, expr->as.triple.first))
       return false;
     sb_append_cstr(sb, ",");
@@ -352,7 +353,7 @@ bool compile_node_func_into_fragment_expression(String_Builder *sb,
     sb_append_cstr(sb, ",");
     if (!compile_node_func_into_fragment_expression(sb, expr->as.triple.third))
       return false;
-    sb_append_cstr(sb, ", 1)");
+    sb_append_cstr(sb, ")");
     break;
 
   case NK_IF:
@@ -386,16 +387,20 @@ bool compile_node_func_into_fragment_shader(String_Builder *sb, Node *f) {
   sb_append_cstr(sb, "#version 330\n");
   sb_append_cstr(sb, "in vec2 fragTexCoord;\n");
   sb_append_cstr(sb, "out vec4 finalColor;\n");
-  sb_append_cstr(sb, "void main() {\n");
 
-  sb_append_cstr(sb, "  float x = fragTexCoord.x;\n");
-  sb_append_cstr(sb, "  float y = fragTexCoord.y;\n");
-  sb_append_cstr(sb, "  finalColor = ");
+  sb_append_cstr(sb, "vec4 map_color(vec3 rgb) {\n");
+  sb_append_cstr(sb, "  return vec4((rgb + 1)/2.0, 1.0);\n");
+  sb_append_cstr(sb, "}\n");
+
+  sb_append_cstr(sb, "void main() {\n");
+  sb_append_cstr(sb, "  float x = fragTexCoord.x * 2.0 - 1.0;\n");
+  sb_append_cstr(sb, "  float y = fragTexCoord.y * 2.0 - 1.0;\n");
+  sb_append_cstr(sb, "  finalColor = map_color(");
   if (!compile_node_func_into_fragment_expression(sb, f))
     return false;
-
-  sb_append_cstr(sb, ";\n");
+  sb_append_cstr(sb, ");\n");
   sb_append_cstr(sb, "}\n");
+
   return true;
 }
 
@@ -449,21 +454,12 @@ int main(int argc, char **argv) {
       nob_log(ERROR, "Process could not terminate\n");
       exit(69);
     }
-    NODE_PRINT_LN(f);
 
     String_Builder sb = {0};
     if (!compile_node_func_into_fragment_shader(&sb, f))
       return 1;
     sb_append_null(&sb);
     printf("%s", sb.items);
-
-    const char *fs_shader =
-        "#version 330\n"
-        "in vec2 fragTexCoord;\n"
-        "out vec4 finalColor;\n"
-        "void main() {\n"
-        "  finalColor = vec4(fragTexCoord.x, fragTexCoord.y, 0, 1);\n"
-        "}\n";
 
     Shader shader = LoadShaderFromMemory(NULL, sb.items);
     Texture default_texture = GetDefaultTexture();
@@ -472,15 +468,16 @@ int main(int argc, char **argv) {
     while (!WindowShouldClose()) {
       BeginDrawing();
 
-      int size = 300;
+      int size = 500;
       BeginShaderMode(shader);
-      DrawTextureEx(default_texture, (Vector2){0, 0}, 0, size, RED);
-      // DrawRectangle((GetScreenWidth() - size) / 2,
-      //               (GetScreenHeight() - size) / 2, size, size, RED);
+      DrawTexturePro(default_texture, (Rectangle){0, 0, 1, 1},
+                     (Rectangle){0, 0, GetScreenWidth(), GetScreenHeight()},
+                     (Vector2){0}, 0, WHITE);
       EndShaderMode();
 
       EndDrawing();
     }
+
     return 0;
   }
 
