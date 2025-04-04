@@ -33,8 +33,7 @@ Node *node_unop_loc(const char *file, int line, Node *value) {
   }
 NODE_UNOP_LOC(node_sqrt_loc, NK_SQRT);
 
-Node *node_binop_loc(const char *file, int line, Node_Kind kind, Node *lhs,
-                     Node *rhs) {
+Node *node_binop_loc(const char *file, int line, Node_Kind kind, Node *lhs, Node *rhs) {
   Node *node = node_loc(file, line, kind);
   node->as.binop.lhs = lhs;
   node->as.binop.rhs = rhs;
@@ -53,8 +52,7 @@ NODE_BINOP_LOC(node_mult_loc, NK_MULT);
 NODE_BINOP_LOC(node_mod_loc, NK_MOD);
 NODE_BINOP_LOC(node_gt_loc, NK_GT);
 
-Node *node_triple_loc(const char *file, int line, Node *first, Node *second,
-                      Node *third) {
+Node *node_triple_loc(const char *file, int line, Node *first, Node *second, Node *third) {
   Node *node = node_loc(file, line, NK_TRIPLE);
   node->as.triple.first = first;
   node->as.triple.second = second;
@@ -63,8 +61,7 @@ Node *node_triple_loc(const char *file, int line, Node *first, Node *second,
   return node;
 }
 
-Node *node_if_loc(const char *file, int line, Node *cond, Node *then,
-                  Node *elze) {
+Node *node_if_loc(const char *file, int line, Node *cond, Node *then, Node *elze) {
   Node *node = node_loc(file, line, NK_IF);
   node->as.iff.cond = cond;
   node->as.iff.then = then;

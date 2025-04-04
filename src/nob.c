@@ -58,6 +58,10 @@ int main(int argc, char *argv[]) {
       cmd_append(&cmd, "./main", "gui");
       if (!cmd_run_sync_and_reset(&cmd))
         return 1;
+    } else if (strcmp(argv[1], "parse") == 0) {
+      cmd_append(&cmd, "./main", "parse", "../grammars/grammar.bnf");
+      if (!cmd_run_sync_and_reset(&cmd))
+        return 1;
     }
   }
 

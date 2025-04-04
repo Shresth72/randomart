@@ -6,6 +6,10 @@ gui:
 	cd src && \
 	./nob gui
 
+parse:
+	cd src && \
+	./nob parse
+
 compile:
 	cd src && \
 	./nob

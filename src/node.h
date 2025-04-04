@@ -128,10 +128,8 @@ Node *node_mult_loc(const char *file, int line, Node *lhs, Node *rhs);
 Node *node_mod_loc(const char *file, int line, Node *lhs, Node *rhs);
 Node *node_gt_loc(const char *file, int line, Node *lhs, Node *rhs);
 
-Node *node_triple_loc(const char *file, int line, Node *first, Node *second,
-                      Node *third);
-Node *node_if_loc(const char *file, int line, Node *cond, Node *then,
-                  Node *elze);
+Node *node_triple_loc(const char *file, int line, Node *first, Node *second, Node *third);
+Node *node_if_loc(const char *file, int line, Node *cond, Node *then, Node *elze);
 
 // UTIL MACROS
 #define NODE_PRINT_LN(node) (node_print(node), printf("\n"))

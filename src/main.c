@@ -1,5 +1,4 @@
 #include "grammar.h"
-#include "lib/raylib/raylib-5.5_linux_amd64/include/raylib.h"
 #include "node.h"
 
 #define NOB_IMPLEMENTATION
@@ -9,6 +8,9 @@
 #define ARENA_IMPLEMENTATION
 #include "lib/arena.h"
 
+#define ALEXER_IMPLEMENTATION
+#include "lib/alexer.h"
+
 #define WINDOW_WIDTH 800
 #define WINDOW_HEIGHT 600
 #define WIDTH 400
@@ -17,7 +19,27 @@
 #define GRAMMAR_DEPTH 20
 
 static Arena node_arena = {0};
-// static Color pixels[WIDTH * HEIGHT];
+
+typedef enum {
+  PUNCT_BAR,
+  PUNCT_OPAREN,
+  PUNCT_CPAREN,
+  PUNCT_COMMA,
+  PUNCT_SEMICOLON,
+  COUNT_PUNCTS,
+} Punct_Index;
+
+const char *puncts[COUNT_PUNCTS] = {
+  [PUNCT_BAR]       = "|", 
+  [PUNCT_OPAREN]    = "(", 
+  [PUNCT_CPAREN]    = ")", 
+  [PUNCT_COMMA]     = ",", 
+  [PUNCT_SEMICOLON] = ";"
+};
+
+const char *comments[] = {
+  "#",
+};
 
 // Arena allocator for 'Node' in node_arena
 Node *node_loc(const char *file, int line, Node_Kind kind) {
@@ -31,8 +53,7 @@ Node *node_loc(const char *file, int line, Node_Kind kind) {
 
 // Dynamic Arena allocator for 'Grammar' in node_arena
 void append_branch(Grammar_Branches *branches, Node *node, float probability) {
-  arena_da_append(&node_arena, branches,
-                  ((Grammar_Branch){.node = node, .probability = probability}));
+  arena_da_append(&node_arena, branches, ((Grammar_Branch){.node = node, .probability = probability}));
 }
 
 /// Evaluate Node Expressions (AST)
@@ -69,16 +90,13 @@ Node *eval(Node *expr, float x, float y, float t) {
 
   case NK_IF: {
     Node *cond = eval(expr->as.iff.cond, x, y, t);
-    if (!cond || !expect_kind(cond, NK_BOOLEAN))
-      return NULL;
+    if (!cond || !expect_kind(cond, NK_BOOLEAN)) return NULL;
 
     Node *then = eval(expr->as.iff.then, x, y, t);
-    if (!then || !expect_kind(then, NK_TRIPLE))
-      return NULL;
+    if (!then || !expect_kind(then, NK_TRIPLE)) return NULL;
 
     Node *elze = eval(expr->as.iff.elze, x, y, t);
-    if (!elze || !expect_kind(elze, NK_TRIPLE))
-      return NULL;
+    if (!elze || !expect_kind(elze, NK_TRIPLE)) return NULL;
 
     return cond->as.boolean ? then : elze;
   }
@@ -172,44 +190,39 @@ Node *gen_node(Grammar grammar, Node *node, int depth) {
   case NK_MOD:
   case NK_GT: {
     Node *lhs = gen_node(grammar, node->as.binop.lhs, depth);
-    if (!lhs)
-      return NULL;
+    if (!lhs) return NULL;
     Node *rhs = gen_node(grammar, node->as.binop.rhs, depth);
-    if (!rhs)
-      return NULL;
+    if (!rhs) return NULL;
+
     return node_binop_loc(node->file, node->line, node->kind, lhs, rhs);
   }
 
   case NK_SQRT: {
     Node *value = gen_node(grammar, node->as.unop, depth);
-    if (!value)
-      return NULL;
+    if (!value) return NULL;
+
     return node_unop_loc(node->file, node->line, value);
   }
 
   case NK_TRIPLE: {
     Node *first = gen_node(grammar, node->as.triple.first, depth);
-    if (!first)
-      return NULL;
+    if (!first) return NULL;
     Node *second = gen_node(grammar, node->as.triple.second, depth);
-    if (!second)
-      return NULL;
+    if (!second) return NULL;
     Node *third = gen_node(grammar, node->as.triple.third, depth);
-    if (!third)
-      return NULL;
+    if (!third) return NULL;
+
     return node_triple_loc(node->file, node->line, first, second, third);
   }
 
   case NK_IF: {
     Node *cond = gen_node(grammar, node->as.iff.cond, depth);
-    if (!cond)
-      return NULL;
+    if (!cond) return NULL;
     Node *then = gen_node(grammar, node->as.iff.then, depth);
-    if (!then)
-      return NULL;
+    if (!then) return NULL;
     Node *elze = gen_node(grammar, node->as.iff.elze, depth);
-    if (!elze)
-      return NULL;
+    if (!elze) return NULL;
+
     return node_if_loc(node->file, node->line, cond, then, elze);
   }
 
@@ -263,8 +276,7 @@ int simple_grammar(Grammar *grammar) {
   int c = 2;
 
   // E
-  append_branch(&branches,
-                node_triple(node_rule(c), node_rule(c), node_rule(c)), 1.f);
+  append_branch(&branches, node_triple(node_rule(c), node_rule(c), node_rule(c)), 1.f);
   arena_da_append(&node_arena, grammar, branches);
   memset(&branches, 0, sizeof(branches));
 
@@ -274,12 +286,11 @@ int simple_grammar(Grammar *grammar) {
   append_branch(&branches, node_y(), 1.f / 5.f);
   append_branch(&branches, node_t(), 1.f / 5.f);
   append_branch(&branches,
-                node_sqrt(                                 //
-                    node_add(                              //
-                        node_add(                          //
-                            node_mult(node_x(), node_x()), //
-                            node_mult(node_y(), node_y())  //
-                            ),
+                node_sqrt(
+                    node_add(
+                        node_add(
+                            node_mult(node_x(), node_x()),
+                            node_mult(node_y(), node_y())),
                         node_mult(node_t(), node_t()))),
                 1.f / 5.f);
   arena_da_append(&node_arena, grammar, branches);
@@ -306,8 +317,7 @@ Texture GetDefaultTexture() {
   };
 }
 
-bool compile_node_func_into_fragment_expression(String_Builder *sb,
-                                                Node *expr) {
+bool compile_node_func_into_fragment_expression(String_Builder *sb, Node *expr) {
   switch (expr->kind) {
   case NK_X:
   case NK_Y:
@@ -327,7 +337,7 @@ bool compile_node_func_into_fragment_expression(String_Builder *sb,
 
   case NK_ADD:
   case NK_MULT:
-  case NK_GT:
+  case NK_GT: {
     sb_append_cstr(sb, "(");
     if (!compile_node_func_into_fragment_expression(sb, expr->as.binop.lhs))
       return false;
@@ -335,9 +345,9 @@ bool compile_node_func_into_fragment_expression(String_Builder *sb,
     if (!compile_node_func_into_fragment_expression(sb, expr->as.binop.rhs))
       return false;
     sb_append_cstr(sb, ")");
-    break;
+  } break;
 
-  case NK_MOD:
+  case NK_MOD: {
     sb_append_cstr(sb, "mod(");
     if (!compile_node_func_into_fragment_expression(sb, expr->as.binop.lhs))
       return false;
@@ -345,16 +355,16 @@ bool compile_node_func_into_fragment_expression(String_Builder *sb,
     if (!compile_node_func_into_fragment_expression(sb, expr->as.binop.rhs))
       return false;
     sb_append_cstr(sb, ")");
-    break;
+  } break;
 
-  case NK_SQRT:
+  case NK_SQRT: {
     sb_append_cstr(sb, "sqrt(");
     if (!compile_node_func_into_fragment_expression(sb, expr->as.unop))
       return false;
     sb_append_cstr(sb, ")");
-    break;
+  } break;
 
-  case NK_TRIPLE:
+  case NK_TRIPLE: {
     sb_append_cstr(sb, "vec3(");
     if (!compile_node_func_into_fragment_expression(sb, expr->as.triple.first))
       return false;
@@ -365,9 +375,9 @@ bool compile_node_func_into_fragment_expression(String_Builder *sb,
     if (!compile_node_func_into_fragment_expression(sb, expr->as.triple.third))
       return false;
     sb_append_cstr(sb, ")");
-    break;
+  } break;
 
-  case NK_IF:
+  case NK_IF: {
     sb_append_cstr(sb, "(");
     if (!compile_node_func_into_fragment_expression(sb, expr->as.iff.cond))
       return false;
@@ -378,7 +388,7 @@ bool compile_node_func_into_fragment_expression(String_Builder *sb,
     if (!compile_node_func_into_fragment_expression(sb, expr->as.iff.elze))
       return false;
     sb_append_cstr(sb, ")");
-    break;
+  } break;
 
   case NK_RULE:
   case NK_RANDOM:
@@ -409,8 +419,7 @@ bool compile_node_func_into_fragment_shader(String_Builder *sb, Node *f) {
   sb_append_cstr(sb, "  float y = fragTexCoord.y * 2.0 - 1.0;\n");
   sb_append_cstr(sb, "  float t = sin(time);\n");
   sb_append_cstr(sb, "  finalColor = map_color(");
-  if (!compile_node_func_into_fragment_expression(sb, f))
-    return false;
+  if (!compile_node_func_into_fragment_expression(sb, f)) return false;
   sb_append_cstr(sb, ");\n");
   sb_append_cstr(sb, "}\n");
 
@@ -449,10 +458,8 @@ int main(int argc, char **argv) {
     NODE_PRINT_LN(f);
 
     Image image = GenImageColor(WIDTH, HEIGHT, BLANK);
-    if (!render_pixels(image, f))
-      return 1;
-    if (!ExportImage(image, output_path))
-      return 1;
+    if (!render_pixels(image, f)) return 1;
+    if (!ExportImage(image, output_path)) return 1;
 
     return 0;
   }
@@ -488,15 +495,46 @@ int main(int argc, char **argv) {
       SetShaderValue(shader, time_loc, &time, SHADER_UNIFORM_FLOAT);
 
       BeginShaderMode(shader);
-      DrawTexturePro(default_texture, (Rectangle){0, 0, 1, 1},
-                     (Rectangle){0, 0, GetScreenWidth(), GetScreenHeight()},
-                     (Vector2){0}, 0, WHITE);
+      DrawTexturePro(
+        default_texture, 
+        (Rectangle){0, 0, 1, 1},
+        (Rectangle){0, 0, GetScreenWidth(), GetScreenHeight()},
+        (Vector2){0},
+        0, 
+        WHITE
+      );
       EndShaderMode();
 
       EndDrawing();
     }
 
     return 0;
+  }
+
+  if (strcmp(command_name, "parse") == 0) {
+    if (argc <= 0) {
+      nob_log(ERROR, "Usage: %s %s <input>", program_name, command_name);
+      nob_log(ERROR, "No input is provided");
+      return 1;
+    }
+
+    const char *input_path = shift(argv, argc);
+
+    String_Builder sb = {0};
+    if (!read_entire_file(input_path, &sb)) return 1;
+
+    Alexer l = alexer_create(input_path, sb.items, sb.count);
+    l.puncts = puncts;
+    l.puncts_count = COUNT_PUNCTS;
+    l.sl_comments = comments;
+    l.sl_comments_count = ARRAY_LEN(comments);
+
+    Alexer_Token t = {0};
+    alexer_get_token(&l, &t);
+    while (alexer_get_token(&l, &t)) {
+      l.diagf(t.loc, "INFO", "%s %.*s", alexer_kind_name(t.kind), t.end - t.begin, t.begin);
+    }
+    if (!alexer_expect_kind(&l, t, ALEXER_END)) return 1;
   }
 
   nob_log(ERROR, "Unknown command: %s", command_name);

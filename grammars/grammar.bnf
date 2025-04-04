@@ -1,0 +1,15 @@
+# Entry Node
+E | vec3(C, C, C)
+  ;
+
+# Terminal Nodes
+A | random
+  | x
+  | y
+  ;
+
+# Binary Operations
+C ||  A               # 1/4
+  ||| add(C, C)       # 3/8
+  ||| mult(C, C)      # 3/8
+  ;
