@@ -514,29 +514,53 @@ int parse_optional_depth(char **argv, int argc_) {
     return GRAMMAR_DEPTH;
 }
 
+bool parse_node(Alexer *l, Node **node) {
+  Alexer_Token name = {0};
+
+  alexer_get_token(l, &name);
+  if (!alexer_expect_kind(l, name, ALEXER_SYMBOL)) return false;
+
+  UNUSED(node);
+  TODO("parse_node");
+  
+  return false;
+}
+
 bool parse_grammar_branch(Alexer *l, Grammar_Branch *branch) {
-  // alexer_get_token(l, &t);
-  // while (t.kind == ALEXER_PUNCT && t.punct_index == PUNCT_BAR) {
-  //   weight += 1;
-  //   alexer_get_token(&l, &t);
-  // }
-  // return false;
+  Alexer_Token t = {0};
+  Alexer_State s = alexer_save(l);
+
+  alexer_get_token(l, &t);
+  while (t.kind == ALEXER_PUNCT && t.punct_index == PUNCT_BAR) {
+    branch->weight += 1;
+    s = alexer_save(l);
+    alexer_get_token(l, &t);
+  }
+  alexer_rewind(l, s);
+  
+  if (!parse_node(l, &branch->node)) return false;
+  return false;
 }
 
 bool parse_grammar_branches(Alexer *l, Alexer_Token name, Grammar_Branches *branches) {
   branches->name = name;
   
   Alexer_Token t = {0};
-  alexer_get_token(l, &t);
 
   size_t branch_start[] = {PUNCT_BAR, PUNCT_SEMICOLON};
   bool quit = false;
   
   while (!quit) {
+    Alexer_State s = alexer_save(l);
+
+    alexer_get_token(l, &t);
     if (!alexer_expect_one_of_puncts(l, t, branch_start, ARRAY_LEN(branch_start))) return false;
+
     switch (t.punct_index) {
     case PUNCT_BAR: {
-        Grammar_Branch branch = {.weight = 1};
+        alexer_rewind(l, s);
+
+        Grammar_Branch branch = {};
         if (!parse_grammar_branch(l, &branch)) return false;
         arena_da_append(&node_arena, branches, branch);
       } break;
