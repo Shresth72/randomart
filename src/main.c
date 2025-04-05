@@ -1,5 +1,6 @@
 #include "grammar.h"
 #include "node.h"
+#include <stdio.h>
 
 #define NOB_IMPLEMENTATION
 #define NOB_STRIP_PREFIX
@@ -431,6 +432,23 @@ bool compile_node_func_into_fragment_shader(String_Builder *sb, Node *f) {
   return true;
 }
 
+int parse_optional_depth(char **argv, int argc_) {
+    if (argc_ >= 1 && strcmp(argv[0], "-depth") == 0) {
+      shift(argv, argc_);
+      if (argc_ >= 1) {
+        const char *depth_str = shift(argv, argc_);
+        if (depth_str) {
+          return atoi(depth_str);
+        } 
+      } else {
+        nob_log(WARNING, "Expected value after -depth flag, using default depth: %d", GRAMMAR_DEPTH);
+        return GRAMMAR_DEPTH;
+      }
+    } 
+    nob_log(INFO, "No depth provided, using default depth: %d", GRAMMAR_DEPTH);
+    return GRAMMAR_DEPTH;
+}
+
 int main(int argc, char **argv) {
   srand(time(0));
 
@@ -444,17 +462,18 @@ int main(int argc, char **argv) {
   const char *command_name = shift(argv, argc);
   if (strcmp(command_name, "file") == 0) {
     if (argc <= 0) {
-      nob_log(ERROR, "Usage: %s %s <output_path>", program_name, command_name);
+      nob_log(ERROR, "Usage: %s %s <output_path> -depth <depth>", program_name, command_name);
       nob_log(ERROR, "No output path is provided");
       return 1;
     }
+
     const char *output_path = shift(argv, argc);
 
     // Node *f = gray_gradient_ast();
     // Node* f = cool_gradient_ast();
     Grammar grammar = {0};
     int entry = simple_grammar(&grammar);
-    Node *f = gen_rule(grammar, entry, GRAMMAR_DEPTH);
+    Node *f = gen_rule(grammar, entry, parse_optional_depth(argv, argc));
     if (!f) {
       nob_log(ERROR, "Process could not terminate\n");
       exit(69);
@@ -474,7 +493,7 @@ int main(int argc, char **argv) {
 
     Grammar grammar = {0};
     int entry = simple_grammar(&grammar);
-    Node *f = gen_rule(grammar, entry, GRAMMAR_DEPTH);
+    Node *f = gen_rule(grammar, entry, parse_optional_depth(argv, argc));
     if (!f) {
       nob_log(ERROR, "Process could not terminate\n");
       exit(69);

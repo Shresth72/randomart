@@ -6,14 +6,16 @@ for each pixel coordinate. @tsoding
 
 ### Run
 
-Generate random image into a file
+Generate random image into a file (depth is optional)
 
 ```bash
-make run
+cd src
+./nob run -depth <depth>
 ```
 
 Generate random shader code and render it into a gui using raylib
 
 ```bash
-make gui
+cd src
+./nob gui -depth <depth>
 ```

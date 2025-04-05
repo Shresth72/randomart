@@ -19,15 +19,23 @@
 #define builder_output(cmd, output_path) cmd_append(cmd, "-o", output_path)
 #define builder_inputs(cmd, ...) cmd_append(cmd, __VA_ARGS__)
 #define builder_libs(cmd) cmd_append(cmd, "-lm")
-#define builder_flags(cmd)                                                     \
+#define builder_flags(cmd) \
   cmd_append(cmd, "-Wall", "-Wextra", "-Wswitch-enum", "-ggdb")
-#define builder_include_path(cmd, include_path)                                \
+#define builder_include_path(cmd, include_path) \
   cmd_append(cmd, temp_sprintf("-I%s", include_path))
-
-#define builder_raylib_include_path(cmd)                                       \
+#define builder_raylib_include_path(cmd) \
   cmd_append(cmd, temp_sprintf("-I%s/include", RAYLIB_PATH))
-#define builder_raylib_library_path(cmd)                                       \
+#define builder_raylib_library_path(cmd) \
   cmd_append(cmd, temp_sprintf("-L%s/lib", RAYLIB_PATH), "-l:libraylib.a")
+
+void cmd_append_optional_depth(Nob_Cmd *cmd, char **argv, int argc_) {
+    if (argc_ >= 1 && strcmp(argv[0], "-depth") == 0) {
+        cmd_append(cmd, shift(argv, argc_));
+        if (argc_ >= 1) {
+          cmd_append(cmd, shift(argv, argc_));
+        }
+    }
+}
 
 int main(int argc, char *argv[]) {
   NOB_GO_REBUILD_URSELF(argc, argv);
@@ -42,26 +50,30 @@ int main(int argc, char *argv[]) {
   builder_raylib_include_path(&cmd);
   builder_raylib_library_path(&cmd);
 
-  if (!cmd_run_sync_and_reset(&cmd))
-    return 1;
+  if (!cmd_run_sync_and_reset(&cmd)) return 1;
 
-  if (argc > 1) {
-    if (strcmp(argv[1], "run") == 0) {
+  const char *program_name = shift(argv, argc);
+
+  if (argc > 0) {
+    const char *subcommand = shift(argv, argc);
+
+    if (strcmp(subcommand, "run") == 0) {
       cmd_append(&cmd, "./main", "file", "output/random_image.png");
-      if (!cmd_run_sync_and_reset(&cmd))
-        return 1;
+      cmd_append_optional_depth(&cmd, argv, argc);
+      if (!cmd_run_sync_and_reset(&cmd)) return 1;
 
       cmd_append(&cmd, "kitty", "icat", "output/random_image.png");
-      if (!cmd_run_sync_and_reset(&cmd))
-        return 1;
-    } else if (strcmp(argv[1], "gui") == 0) {
+      if (!cmd_run_sync_and_reset(&cmd)) return 1;
+    } else if (strcmp(subcommand, "gui") == 0) {
       cmd_append(&cmd, "./main", "gui");
-      if (!cmd_run_sync_and_reset(&cmd))
-        return 1;
-    } else if (strcmp(argv[1], "parse") == 0) {
-      cmd_append(&cmd, "./main", "parse", "../grammars/grammar.bnf");
-      if (!cmd_run_sync_and_reset(&cmd))
-        return 1;
+      cmd_append_optional_depth(&cmd, argv, argc);
+      if (!cmd_run_sync_and_reset(&cmd)) return 1;
+    } else if (strcmp(subcommand, "parse") == 0) {
+      cmd_append(&cmd, "./main", "parse", "./grammars/grammar.bnf");
+      if (!cmd_run_sync_and_reset(&cmd)) return 1;
+    } else {
+      nob_log(ERROR, "Unknown command: %s", subcommand);
+      return 1;
     }
   }
 

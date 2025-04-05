@@ -16,5 +16,3 @@ compile:
 
 view:
 	kitty icat ./src/output/random_image.png
-
-

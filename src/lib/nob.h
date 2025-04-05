@@ -1168,10 +1168,10 @@ void nob_log(Nob_Log_Level level, const char *fmt, ...) {
     fprintf(stderr, "[INFO] ");
     break;
   case NOB_WARNING:
-    fprintf(stderr, "[WARNING] ");
+    fprintf(stderr, "%s[WARNING]%s ", "\x1b[33m", "\x1b[0m");
     break;
   case NOB_ERROR:
-    fprintf(stderr, "[ERROR] ");
+    fprintf(stderr, "%s[ERROR]%s ", "\x1b[31m", "\x1b[0m");
     break;
   case NOB_NO_LOGS:
     return;
