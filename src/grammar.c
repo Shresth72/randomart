@@ -8,7 +8,7 @@ void grammar_print(Grammar grammar) {
       if (j > 0)
         printf(" | ");
       node_print(branches->items[j].node);
-      printf(" [%.02f]", branches->items[i].probability);
+      printf(" [%zu]", branches->items[i].weight);
     }
     printf("\n");
   }

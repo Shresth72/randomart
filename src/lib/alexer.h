@@ -441,11 +441,28 @@ defer:
 }
 
 void alexer_default_diagf(Alexer_Loc loc, const char *level, const char *fmt, ...) {
+  const char *color_start;
+  const char *color_reset = "\033[0m";
+
+  if (strcmp(level, "ERROR") == 0) {
+    color_start = "\033[1;31m"; // red
+  } else if (strcmp(level, "WARNING") == 0) {
+    color_start = "\033[1;33m"; // yellow
+  } else if (strcmp(level, "INFO") == 0) {
+    color_start = "\033[1;32m"; // green
+  } else {
+    color_start = "";
+    color_reset = "";
+  }
+
   va_list args;
   va_start(args, fmt);
-  fprintf(stderr, Alexer_Loc_Fmt ": %s: ", Alexer_Loc_Arg(loc), level);
+
+  // Color only the location and level, not the actual message
+  fprintf(stderr, "%s" Alexer_Loc_Fmt ": %s:%s ", color_start, Alexer_Loc_Arg(loc), level, color_reset);
   vfprintf(stderr, fmt, args);
   fprintf(stderr, "\n");
+
   va_end(args);
 }
 

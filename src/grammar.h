@@ -2,13 +2,14 @@
 
 typedef struct {
   Node *node;
-  float probability;
+  size_t weight;
 } Grammar_Branch;
 
 typedef struct {
   Grammar_Branch *items;
   size_t capacity;
   size_t count;
+  size_t weight_sum;
 } Grammar_Branches;
 
 typedef struct {

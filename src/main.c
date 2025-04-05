@@ -52,8 +52,16 @@ Node *node_loc(const char *file, int line, Node_Kind kind) {
 }
 
 // Dynamic Arena allocator for 'Grammar' in node_arena
-void append_branch(Grammar_Branches *branches, Node *node, float probability) {
-  arena_da_append(&node_arena, branches, ((Grammar_Branch){.node = node, .probability = probability}));
+void append_branch(Grammar_Branches *branches, Node *node, size_t weight) {
+  arena_da_append(&node_arena, branches, ((Grammar_Branch){.node = node, .weight = weight}));
+}
+
+void grammar_append_branches(Grammar *grammar, Grammar_Branches *branches) {
+  for (size_t i = 0; i < branches->count; ++i) {
+    branches->weight_sum += branches->items[i].weight;
+  }
+  arena_da_append(&node_arena, grammar, *branches);
+  memset(branches, 0, sizeof(*branches));
 }
 
 /// Evaluate Node Expressions (AST)
@@ -254,7 +262,7 @@ Node *gen_rule(Grammar grammar, size_t rule, int depth) {
     float p = rand_float();
     float t = 0.0f;
     for (size_t i = 0; i < branches->count; ++i) {
-      t += branches->items[i].probability;
+      t += (float)branches->items[i].weight / branches->weight_sum;
       if (t >= p) {
         node = gen_node(grammar, branches->items[i].node, depth - 1);
         break;
@@ -276,15 +284,14 @@ int simple_grammar(Grammar *grammar) {
   int c = 2;
 
   // E
-  append_branch(&branches, node_triple(node_rule(c), node_rule(c), node_rule(c)), 1.f);
-  arena_da_append(&node_arena, grammar, branches);
-  memset(&branches, 0, sizeof(branches));
+  append_branch(&branches, node_triple(node_rule(c), node_rule(c), node_rule(c)), 1);
+  grammar_append_branches(grammar, &branches);
 
   // A
-  append_branch(&branches, node_random(), 1.f / 5.f);
-  append_branch(&branches, node_x(), 1.f / 5.f);
-  append_branch(&branches, node_y(), 1.f / 5.f);
-  append_branch(&branches, node_t(), 1.f / 5.f);
+  append_branch(&branches, node_random(), 1);
+  append_branch(&branches, node_x(), 1);
+  append_branch(&branches, node_y(), 1);
+  append_branch(&branches, node_t(), 1);
   append_branch(&branches,
                 node_sqrt(
                     node_add(
@@ -292,16 +299,14 @@ int simple_grammar(Grammar *grammar) {
                             node_mult(node_x(), node_x()),
                             node_mult(node_y(), node_y())),
                         node_mult(node_t(), node_t()))),
-                1.f / 5.f);
-  arena_da_append(&node_arena, grammar, branches);
-  memset(&branches, 0, sizeof(branches));
+                1);
+  grammar_append_branches(grammar, &branches);
 
   // C
-  append_branch(&branches, node_rule(a), 1.f / 4.f);
-  append_branch(&branches, node_add(node_rule(c), node_rule(c)), 3.f / 8.f);
-  append_branch(&branches, node_mult(node_rule(c), node_rule(c)), 3.f / 8.f);
-  arena_da_append(&node_arena, grammar, branches);
-  memset(&branches, 0, sizeof(branches));
+  append_branch(&branches, node_rule(a), 2);
+  append_branch(&branches, node_add(node_rule(c), node_rule(c)), 3);
+  append_branch(&branches, node_mult(node_rule(c), node_rule(c)), 3);
+  grammar_append_branches(grammar, &branches);
 
   GRAMMAR_PRINT_LN(*grammar);
   return e;
@@ -530,11 +535,35 @@ int main(int argc, char **argv) {
     l.sl_comments_count = ARRAY_LEN(comments);
 
     Alexer_Token t = {0};
-    alexer_get_token(&l, &t);
-    while (alexer_get_token(&l, &t)) {
-      l.diagf(t.loc, "INFO", "%s %.*s", alexer_kind_name(t.kind), t.end - t.begin, t.begin);
+    Alexer_Kind top_level_start[] = {ALEXER_SYMBOL, ALEXER_END};
+    bool quit = false;
+
+    while (!quit) {
+      alexer_get_token(&l, &t);
+      if (!alexer_expect_one_of_kinds(&l, t, top_level_start, ARRAY_LEN(top_level_start))) return 1;
+
+      switch (t.kind) {
+      case ALEXER_SYMBOL: {
+        Alexer_Token rule_name = t;
+        alexer_get_token(&l, &t);
+        if (!alexer_expect_punct(&l, t, PUNCT_BAR)) return 1;  
+
+        size_t probability = 0;
+        while (t.kind == ALEXER_PUNCT && t.punct_index == PUNCT_BAR) {
+          probability += 1;
+          alexer_get_token(&l, &t);
+        }
+  
+        l.diagf(rule_name.loc, "INFO", "Rule "Alexer_Token_Fmt" with probability %zu", Alexer_Token_Arg(rule_name), probability);
+
+        return 0;
+      } break;
+
+      case ALEXER_END: quit = true; break;
+      default:
+        UNREACHABLE_CODE("top_level");
+      }
     }
-    if (!alexer_expect_kind(&l, t, ALEXER_END)) return 1;
   }
 
   nob_log(ERROR, "Unknown command: %s", command_name);
