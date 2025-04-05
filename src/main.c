@@ -305,8 +305,8 @@ int simple_grammar(Grammar *grammar) {
 
   // C
   append_branch(&branches, node_rule(a), 2);
-  append_branch(&branches, node_add(node_rule(c), node_rule(c)), 3);
-  append_branch(&branches, node_mult(node_rule(c), node_rule(c)), 3);
+  append_branch(&branches, node_add(node_rule(c), node_rule(c)), 2);
+  append_branch(&branches, node_mult(node_rule(c), node_rule(c)), 2);
   grammar_append_branches(grammar, &branches);
 
   GRAMMAR_PRINT_LN(*grammar);
@@ -567,13 +567,13 @@ int main(int argc, char **argv) {
         alexer_get_token(&l, &t);
         if (!alexer_expect_punct(&l, t, PUNCT_BAR)) return 1;  
 
-        size_t probability = 0;
+        size_t weight = 0;
         while (t.kind == ALEXER_PUNCT && t.punct_index == PUNCT_BAR) {
-          probability += 1;
+          weight += 1;
           alexer_get_token(&l, &t);
         }
   
-        l.diagf(rule_name.loc, "INFO", "Rule "Alexer_Token_Fmt" with probability %zu", Alexer_Token_Arg(rule_name), probability);
+        l.diagf(rule_name.loc, "INFO", "Rule "Alexer_Token_Fmt" with weight %zu", Alexer_Token_Arg(rule_name), weight);
 
         return 0;
       } break;
