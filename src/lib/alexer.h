@@ -83,16 +83,7 @@ typedef enum {
   ALEXER_COUNT_KINDS,
 } Alexer_Kind;
 
-static_assert(ALEXER_COUNT_KINDS == 7, "Amount of kinds have changed");
-const char *alexer_kind_names[ALEXER_COUNT_KINDS] = {
-    [ALEXER_INVALID] = "INVALID",
-    [ALEXER_END] = "END",
-    [ALEXER_INT] = "INT",
-    [ALEXER_SYMBOL] = "SYMBOL",
-    [ALEXER_KEYWORD] = "KEYWORD",
-    [ALEXER_PUNCT] = "PUNCT",
-    [ALEXER_STRING] = "STRING",
-};
+extern const char *alexer_kind_names[ALEXER_COUNT_KINDS];
 #define alexer_kind_name(kind) (ALEXER_ASSERT(0 <= kind && kind < ALEXER_COUNT_KINDS), alexer_kind_names[kind])
 
 typedef struct {

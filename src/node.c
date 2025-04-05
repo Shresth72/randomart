@@ -7,9 +7,9 @@ Node *node_number_loc(const char *file, int line, float number) {
   return node;
 }
 
-Node *node_rule_loc(const char *file, int line, int rule) {
+Node *node_rule_loc(const char *file, int line, const char *rule) {
   Node *node = node_loc(file, line, NK_RULE);
-  node->as.rule = rule;
+  node->as.rule = SYMBOL(rule);
   return node;
 }
 
@@ -169,7 +169,7 @@ void node_print(Node *node) {
     break;
 
   case NK_RULE:
-    printf("%s (%d)", node_kind_string(node->kind), node->as.rule);
+    printf("%s("Alexer_Token_Fmt")", node_kind_string(node->kind), Alexer_Token_Arg(node->as.rule));
     break;
   case NK_RANDOM:
     printf("%s", node_kind_string(node->kind));

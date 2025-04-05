@@ -1,6 +1,4 @@
-#include "grammar.h"
 #include "node.h"
-#include <stdio.h>
 
 #define NOB_IMPLEMENTATION
 #define NOB_STRIP_PREFIX
@@ -14,8 +12,8 @@
 
 #define WINDOW_WIDTH 800
 #define WINDOW_HEIGHT 600
-#define WIDTH 400
-#define HEIGHT 400
+#define IMAGE_WIDTH 400
+#define IMAGE_HEIGHT 400
 #define GEN_RULE_MAX_ATTEMPTS 10
 #define GRAMMAR_DEPTH 20
 
@@ -38,9 +36,69 @@ const char *puncts[COUNT_PUNCTS] = {
   [PUNCT_SEMICOLON] = ";"
 };
 
+static_assert(ALEXER_COUNT_KINDS == 7, "Amount of kinds have changed");
+const char *alexer_kind_names[ALEXER_COUNT_KINDS] = {
+    [ALEXER_INVALID] = "INVALID",
+    [ALEXER_END] = "END",
+    [ALEXER_INT] = "INT",
+    [ALEXER_SYMBOL] = "SYMBOL",
+    [ALEXER_KEYWORD] = "KEYWORD",
+    [ALEXER_PUNCT] = "PUNCT",
+    [ALEXER_STRING] = "STRING",
+};
+
 const char *comments[] = {
   "#",
 };
+
+Alexer_Token symbol_impl(const char *file, int line, const char *name_cstr) {
+  UNUSED(file); UNUSED(line);
+
+  return (Alexer_Token) { 
+    .kind = ALEXER_SYMBOL,
+    .loc = {
+      .file_path = __FILE__,
+      .row = __LINE__,
+      .col = 0,
+    },
+    .begin = name_cstr,
+    .end = name_cstr + strlen(name_cstr)
+  };
+}
+
+typedef struct {
+  Node *node;
+  size_t weight;
+} Grammar_Branch;
+
+typedef struct {
+  Grammar_Branch *items;
+  size_t capacity;
+  size_t count;
+  size_t weight_sum;
+  Alexer_Token name;
+} Grammar_Branches;
+
+typedef struct {
+  Grammar_Branches *items;
+  size_t capacity;
+  size_t count;
+} Grammar;
+
+#define GRAMMAR_PRINT_LN(grammar) (grammar_print(grammar), printf("\n"))
+void grammar_print(Grammar grammar) {
+  for (size_t i = 0; i < grammar.count; ++i) {
+    printf("%zu ::= ", i);
+    Grammar_Branches *branches = &grammar.items[i];
+    for (size_t j = 0; j < branches->count; ++j) {
+      if (j > 0)
+        printf(" | ");
+      node_print(branches->items[j].node);
+      printf(" [%zu]", branches->items[i].weight);
+    }
+    printf("\n");
+  }
+}
 
 // Arena allocator for 'Node' in node_arena
 Node *node_loc(const char *file, int line, Node_Kind kind) {
@@ -57,10 +115,12 @@ void append_branch(Grammar_Branches *branches, Node *node, size_t weight) {
   arena_da_append(&node_arena, branches, ((Grammar_Branch){.node = node, .weight = weight}));
 }
 
-void grammar_append_branches(Grammar *grammar, Grammar_Branches *branches) {
+void grammar_append_branches(Grammar *grammar, Grammar_Branches *branches, const char *name) {
+  branches->name = SYMBOL(name);
   for (size_t i = 0; i < branches->count; ++i) {
     branches->weight_sum += branches->items[i].weight;
   }
+
   arena_da_append(&node_arena, grammar, *branches);
   memset(branches, 0, sizeof(*branches));
 }
@@ -143,17 +203,17 @@ bool eval_func(Node *f, float x, float y, float t, Vector3 *c) {
 bool render_pixels(Image image, Node *f) {
   Color *pixels = image.data;
 
-  for (size_t y = 0; y < HEIGHT; ++y) {
-    // 0..<HEIGHT => 0..1 => 0..2 => -1..1
-    float ny = (float)y / HEIGHT * 2.0f - 1;
-    for (size_t x = 0; x < WIDTH; ++x) {
-      float nx = (float)x / WIDTH * 2.0f - 1;
+  for (size_t y = 0; y < IMAGE_HEIGHT; ++y) {
+    // 0..<IMAGE_HEIGHT => 0..1 => 0..2 => -1..1
+    float ny = (float)y / IMAGE_HEIGHT * 2.0f - 1;
+    for (size_t x = 0; x < IMAGE_WIDTH; ++x) {
+      float nx = (float)x / IMAGE_WIDTH * 2.0f - 1;
 
       Vector3 c;
       if (!eval_func(f, nx, ny, 0.0f, &c))
         return false;
 
-      size_t index = y * WIDTH + x;
+      size_t index = y * IMAGE_WIDTH + x;
       pixels[index].r = (c.x + 1) / 2 * 255;
       pixels[index].g = (c.y + 1) / 2 * 255;
       pixels[index].b = (c.z + 1) / 2 * 255;
@@ -184,6 +244,7 @@ Node *cool_gradient_ast() {
 }
 
 float rand_float(void) { return (float)rand() / RAND_MAX; }
+Node *gen_rule(Grammar grammar, Alexer_Token rule, int depth);
 
 Node *gen_node(Grammar grammar, Node *node, int depth) {
   switch (node->kind) {
@@ -248,13 +309,20 @@ Node *gen_node(Grammar grammar, Node *node, int depth) {
   }
 }
 
-Node *gen_rule(Grammar grammar, size_t rule, int depth) {
+Grammar_Branches *branches_by_name(Grammar *grammar, Alexer_Token rule) {
+  for (size_t i = 0; i < grammar->count; ++i) {
+    if (alexer_token_text_equal(grammar->items[i].name, rule)) {
+      return &grammar->items[i];
+    }
+  }
+  return NULL;
+}
+
+Node *gen_rule(Grammar grammar, Alexer_Token rule, int depth) {
   if (depth <= 0)
     return NULL;
 
-  assert(rule < grammar.count);
-
-  Grammar_Branches *branches = &grammar.items[rule];
+  Grammar_Branches *branches = branches_by_name(&grammar, rule);
   assert(branches->count > 0);
 
   Node *node = NULL;
@@ -278,15 +346,12 @@ Node *gen_rule(Grammar grammar, size_t rule, int depth) {
 // E ::= (C, C, C) ^ (1, 1),
 // A ::=〈random number ∈ [-1, 1]〉^ (1/3) | x ^ (1/3) | y ^ (1/3),
 // C ::= A ^ (1/4) | add(C, C) ^ (3/8) | multi(C, C) ^ (3/8)
-int simple_grammar(Grammar *grammar) {
+Alexer_Token simple_grammar(Grammar *grammar) {
   Grammar_Branches branches = {0};
-  size_t e = 0;
-  int a = 1;
-  int c = 2;
 
   // E
-  append_branch(&branches, node_triple(node_rule(c), node_rule(c), node_rule(c)), 1);
-  grammar_append_branches(grammar, &branches);
+  append_branch(&branches, node_triple(node_rule("C"), node_rule("C"), node_rule("C")), 1);
+  grammar_append_branches(grammar, &branches, "E");
 
   // A
   append_branch(&branches, node_random(), 1);
@@ -301,16 +366,16 @@ int simple_grammar(Grammar *grammar) {
                             node_mult(node_y(), node_y())),
                         node_mult(node_t(), node_t()))),
                 1);
-  grammar_append_branches(grammar, &branches);
+  grammar_append_branches(grammar, &branches, "A");
 
   // C
-  append_branch(&branches, node_rule(a), 2);
-  append_branch(&branches, node_add(node_rule(c), node_rule(c)), 2);
-  append_branch(&branches, node_mult(node_rule(c), node_rule(c)), 2);
-  grammar_append_branches(grammar, &branches);
+  append_branch(&branches, node_rule("A"), 2);
+  append_branch(&branches, node_add(node_rule("C"), node_rule("C")), 3);
+  append_branch(&branches, node_mult(node_rule("C"), node_rule("C")), 3);
+  grammar_append_branches(grammar, &branches, "C");
 
   GRAMMAR_PRINT_LN(*grammar);
-  return e;
+  return SYMBOL("E");
 }
 
 Texture GetDefaultTexture() {
@@ -449,6 +514,46 @@ int parse_optional_depth(char **argv, int argc_) {
     return GRAMMAR_DEPTH;
 }
 
+bool parse_grammar_branch(Alexer *l, Grammar_Branch *branch) {
+  // alexer_get_token(l, &t);
+  // while (t.kind == ALEXER_PUNCT && t.punct_index == PUNCT_BAR) {
+  //   weight += 1;
+  //   alexer_get_token(&l, &t);
+  // }
+  // return false;
+}
+
+bool parse_grammar_branches(Alexer *l, Alexer_Token name, Grammar_Branches *branches) {
+  branches->name = name;
+  
+  Alexer_Token t = {0};
+  alexer_get_token(l, &t);
+
+  size_t branch_start[] = {PUNCT_BAR, PUNCT_SEMICOLON};
+  bool quit = false;
+  
+  while (!quit) {
+    if (!alexer_expect_one_of_puncts(l, t, branch_start, ARRAY_LEN(branch_start))) return false;
+    switch (t.punct_index) {
+    case PUNCT_BAR: {
+        Grammar_Branch branch = {.weight = 1};
+        if (!parse_grammar_branch(l, &branch)) return false;
+        arena_da_append(&node_arena, branches, branch);
+      } break;
+
+    case PUNCT_SEMICOLON: quit = true; break;
+    default: UNREACHABLE_CODE("parse_grammar_branches");
+    }
+  }
+
+  branches->weight_sum = 0;
+  for (size_t i = 0; i < branches->count; ++i) {
+    branches->weight_sum += branches->items[i].weight;
+  }
+
+  return true;
+}
+
 int main(int argc, char **argv) {
   srand(time(0));
 
@@ -472,7 +577,7 @@ int main(int argc, char **argv) {
     // Node *f = gray_gradient_ast();
     // Node* f = cool_gradient_ast();
     Grammar grammar = {0};
-    int entry = simple_grammar(&grammar);
+    Alexer_Token entry = simple_grammar(&grammar);
     Node *f = gen_rule(grammar, entry, parse_optional_depth(argv, argc));
     if (!f) {
       nob_log(ERROR, "Process could not terminate\n");
@@ -481,7 +586,7 @@ int main(int argc, char **argv) {
 
     NODE_PRINT_LN(f);
 
-    Image image = GenImageColor(WIDTH, HEIGHT, BLANK);
+    Image image = GenImageColor(IMAGE_WIDTH, IMAGE_HEIGHT, BLANK);
     if (!render_pixels(image, f)) return 1;
     if (!ExportImage(image, output_path)) return 1;
 
@@ -492,7 +597,7 @@ int main(int argc, char **argv) {
     InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "RandomArt");
 
     Grammar grammar = {0};
-    int entry = simple_grammar(&grammar);
+    Alexer_Token entry = simple_grammar(&grammar);
     Node *f = gen_rule(grammar, entry, parse_optional_depth(argv, argc));
     if (!f) {
       nob_log(ERROR, "Process could not terminate\n");
@@ -557,24 +662,17 @@ int main(int argc, char **argv) {
     Alexer_Kind top_level_start[] = {ALEXER_SYMBOL, ALEXER_END};
     bool quit = false;
 
+    Grammar grammar = {0};
+
     while (!quit) {
       alexer_get_token(&l, &t);
       if (!alexer_expect_one_of_kinds(&l, t, top_level_start, ARRAY_LEN(top_level_start))) return 1;
 
       switch (t.kind) {
       case ALEXER_SYMBOL: {
-        Alexer_Token rule_name = t;
-        alexer_get_token(&l, &t);
-        if (!alexer_expect_punct(&l, t, PUNCT_BAR)) return 1;  
-
-        size_t weight = 0;
-        while (t.kind == ALEXER_PUNCT && t.punct_index == PUNCT_BAR) {
-          weight += 1;
-          alexer_get_token(&l, &t);
-        }
-  
-        l.diagf(rule_name.loc, "INFO", "Rule "Alexer_Token_Fmt" with weight %zu", Alexer_Token_Arg(rule_name), weight);
-
+        Grammar_Branches branches = {0};
+        if (!parse_grammar_branches(&l, t, &branches)) return 1;
+        arena_da_append(&node_arena, &grammar, branches);
         return 0;
       } break;
 

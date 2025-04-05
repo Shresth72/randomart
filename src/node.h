@@ -11,6 +11,10 @@
 #include "lib/raylib/raylib-5.5_linux_amd64/include/raylib.h"
 #include "lib/raylib/raylib-5.5_linux_amd64/include/rlgl.h"
 
+// TODO: Seperate out parser and node
+#include "lib/alexer.h"
+#include "lib/arena.h"
+
 typedef struct Node Node;
 
 typedef enum {
@@ -87,7 +91,7 @@ typedef union {
   Node_Triple triple;
   Node_If iff;
 
-  int rule;
+  Alexer_Token rule;
 } Node_As;
 
 struct Node {
@@ -111,12 +115,16 @@ Node *cool_gradient_ast();
 void node_print(Node *node);
 bool expect_kind(Node *expr, Node_Kind kind);
 
+#define SYMBOL(name_cstr) \
+  symbol_impl(__FILE__, __LINE__, name_cstr)
+Alexer_Token symbol_impl(const char *file, int line, const char *name_cstr);
+
 // GRAMMAR FUNCTIONS
 Node *node_loc(const char *file, int line, Node_Kind kind);
 
 Node *node_number_loc(const char *file, int line, float number);
 Node *node_boolean_loc(const char *file, int line, bool boolean);
-Node *node_rule_loc(const char *file, int line, int rule);
+Node *node_rule_loc(const char *file, int line, const char *rule);
 
 Node *node_unop_loc(const char *file, int line, Node *value);
 Node *node_sqrt_loc(const char *file, int line, Node *value);
