@@ -7,9 +7,9 @@
 #ifdef __linux__
 #define RAYLIB_PATH "./lib/raylib/raylib-5.5_linux_amd64"
 #elif defined(_WIN32) || defined(_WIN64)
-#define RAYLIB_PATH "./lib/raylib/raylib_windows"
+#define RAYLIB_PATH "./lib/raylib/raylib-5.5_windows"
 #elif defined(__APPLE__)
-#define RAYLIB_PATH "./lib/raylib/raylib_macos"
+#define RAYLIB_PATH "./lib/raylib/raylib-5.5_macos"
 #else
 #error "Unsupported platform"
 #endif
