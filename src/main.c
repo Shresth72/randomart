@@ -1,4 +1,5 @@
 #include "node.h"
+#include <stdio.h>
 
 #define NOB_IMPLEMENTATION
 #define NOB_STRIP_PREFIX
@@ -28,42 +29,37 @@ typedef enum {
   COUNT_PUNCTS,
 } Punct_Index;
 
-const char *puncts[COUNT_PUNCTS] = {
-  [PUNCT_BAR]       = "|", 
-  [PUNCT_OPAREN]    = "(", 
-  [PUNCT_CPAREN]    = ")", 
-  [PUNCT_COMMA]     = ",", 
-  [PUNCT_SEMICOLON] = ";"
-};
+const char *puncts[COUNT_PUNCTS] = {[PUNCT_BAR] = "|",
+                                    [PUNCT_OPAREN] = "(",
+                                    [PUNCT_CPAREN] = ")",
+                                    [PUNCT_COMMA] = ",",
+                                    [PUNCT_SEMICOLON] = ";"};
 
 static_assert(ALEXER_COUNT_KINDS == 7, "Amount of kinds have changed");
 const char *alexer_kind_names[ALEXER_COUNT_KINDS] = {
-    [ALEXER_INVALID] = "INVALID",
-    [ALEXER_END] = "END",
-    [ALEXER_INT] = "INT",
-    [ALEXER_SYMBOL] = "SYMBOL",
-    [ALEXER_KEYWORD] = "KEYWORD",
-    [ALEXER_PUNCT] = "PUNCT",
+    [ALEXER_INVALID] = "INVALID", [ALEXER_END] = "END",
+    [ALEXER_INT] = "INT",         [ALEXER_SYMBOL] = "SYMBOL",
+    [ALEXER_KEYWORD] = "KEYWORD", [ALEXER_PUNCT] = "PUNCT",
     [ALEXER_STRING] = "STRING",
 };
 
 const char *comments[] = {
-  "#",
+    "#",
 };
 
 Alexer_Token symbol_impl(const char *file, int line, const char *name_cstr) {
-  UNUSED(file); UNUSED(line);
+  UNUSED(file);
+  UNUSED(line);
 
-  return (Alexer_Token) { 
-    .kind = ALEXER_SYMBOL,
-    .loc = {
-      .file_path = __FILE__,
-      .row = __LINE__,
-      .col = 0,
-    },
-    .begin = name_cstr,
-    .end = name_cstr + strlen(name_cstr)
-  };
+  return (Alexer_Token){.kind = ALEXER_SYMBOL,
+                        .loc =
+                            {
+                                .file_path = __FILE__,
+                                .row = __LINE__,
+                                .col = 0,
+                            },
+                        .begin = name_cstr,
+                        .end = name_cstr + strlen(name_cstr)};
 }
 
 typedef struct {
@@ -88,13 +84,15 @@ typedef struct {
 #define GRAMMAR_PRINT_LN(grammar) (grammar_print(grammar), printf("\n"))
 void grammar_print(Grammar grammar) {
   for (size_t i = 0; i < grammar.count; ++i) {
-    printf("%zu ::= ", i);
     Grammar_Branches *branches = &grammar.items[i];
+    printf(Alexer_Token_Fmt "\n", Alexer_Token_Arg(branches->name));
     for (size_t j = 0; j < branches->count; ++j) {
-      if (j > 0)
-        printf(" | ");
-      node_print(branches->items[j].node);
-      printf(" [%zu]", branches->items[i].weight);
+      Grammar_Branch *branch = &branches->items[j];
+      printf(" ");
+      for (size_t k = 0; k < branch->weight; ++k)
+        printf("|");
+      printf(" ");
+      NODE_PRINT_LN(branch->node);
     }
     printf("\n");
   }
@@ -112,10 +110,12 @@ Node *node_loc(const char *file, int line, Node_Kind kind) {
 
 // Dynamic Arena allocator for 'Grammar' in node_arena
 void append_branch(Grammar_Branches *branches, Node *node, size_t weight) {
-  arena_da_append(&node_arena, branches, ((Grammar_Branch){.node = node, .weight = weight}));
+  arena_da_append(&node_arena, branches,
+                  ((Grammar_Branch){.node = node, .weight = weight}));
 }
 
-void grammar_append_branches(Grammar *grammar, Grammar_Branches *branches, const char *name) {
+void grammar_append_branches(Grammar *grammar, Grammar_Branches *branches,
+                             const char *name) {
   branches->name = SYMBOL(name);
   for (size_t i = 0; i < branches->count; ++i) {
     branches->weight_sum += branches->items[i].weight;
@@ -159,13 +159,16 @@ Node *eval(Node *expr, float x, float y, float t) {
 
   case NK_IF: {
     Node *cond = eval(expr->as.iff.cond, x, y, t);
-    if (!cond || !expect_kind(cond, NK_BOOLEAN)) return NULL;
+    if (!cond || !expect_kind(cond, NK_BOOLEAN))
+      return NULL;
 
     Node *then = eval(expr->as.iff.then, x, y, t);
-    if (!then || !expect_kind(then, NK_TRIPLE)) return NULL;
+    if (!then || !expect_kind(then, NK_TRIPLE))
+      return NULL;
 
     Node *elze = eval(expr->as.iff.elze, x, y, t);
-    if (!elze || !expect_kind(elze, NK_TRIPLE)) return NULL;
+    if (!elze || !expect_kind(elze, NK_TRIPLE))
+      return NULL;
 
     return cond->as.boolean ? then : elze;
   }
@@ -260,38 +263,47 @@ Node *gen_node(Grammar grammar, Node *node, int depth) {
   case NK_MOD:
   case NK_GT: {
     Node *lhs = gen_node(grammar, node->as.binop.lhs, depth);
-    if (!lhs) return NULL;
+    if (!lhs)
+      return NULL;
     Node *rhs = gen_node(grammar, node->as.binop.rhs, depth);
-    if (!rhs) return NULL;
+    if (!rhs)
+      return NULL;
 
     return node_binop_loc(node->file, node->line, node->kind, lhs, rhs);
   }
 
   case NK_SQRT: {
     Node *value = gen_node(grammar, node->as.unop, depth);
-    if (!value) return NULL;
+    if (!value)
+      return NULL;
 
-    return node_unop_loc(node->file, node->line, value);
+    return node_unop_loc(node->file, node->line, node->kind, value);
   }
 
   case NK_TRIPLE: {
     Node *first = gen_node(grammar, node->as.triple.first, depth);
-    if (!first) return NULL;
+    if (!first)
+      return NULL;
     Node *second = gen_node(grammar, node->as.triple.second, depth);
-    if (!second) return NULL;
+    if (!second)
+      return NULL;
     Node *third = gen_node(grammar, node->as.triple.third, depth);
-    if (!third) return NULL;
+    if (!third)
+      return NULL;
 
     return node_triple_loc(node->file, node->line, first, second, third);
   }
 
   case NK_IF: {
     Node *cond = gen_node(grammar, node->as.iff.cond, depth);
-    if (!cond) return NULL;
+    if (!cond)
+      return NULL;
     Node *then = gen_node(grammar, node->as.iff.then, depth);
-    if (!then) return NULL;
+    if (!then)
+      return NULL;
     Node *elze = gen_node(grammar, node->as.iff.elze, depth);
-    if (!elze) return NULL;
+    if (!elze)
+      return NULL;
 
     return node_if_loc(node->file, node->line, cond, then, elze);
   }
@@ -350,7 +362,8 @@ Alexer_Token simple_grammar(Grammar *grammar) {
   Grammar_Branches branches = {0};
 
   // E
-  append_branch(&branches, node_triple(node_rule("C"), node_rule("C"), node_rule("C")), 1);
+  append_branch(&branches,
+                node_triple(node_rule("C"), node_rule("C"), node_rule("C")), 1);
   grammar_append_branches(grammar, &branches, "E");
 
   // A
@@ -359,12 +372,9 @@ Alexer_Token simple_grammar(Grammar *grammar) {
   append_branch(&branches, node_y(), 1);
   append_branch(&branches, node_t(), 1);
   append_branch(&branches,
-                node_sqrt(
-                    node_add(
-                        node_add(
-                            node_mult(node_x(), node_x()),
-                            node_mult(node_y(), node_y())),
-                        node_mult(node_t(), node_t()))),
+                node_sqrt(node_add(node_add(node_mult(node_x(), node_x()),
+                                            node_mult(node_y(), node_y())),
+                                   node_mult(node_t(), node_t()))),
                 1);
   grammar_append_branches(grammar, &branches, "A");
 
@@ -388,7 +398,8 @@ Texture GetDefaultTexture() {
   };
 }
 
-bool compile_node_func_into_fragment_expression(String_Builder *sb, Node *expr) {
+bool compile_node_func_into_fragment_expression(String_Builder *sb,
+                                                Node *expr) {
   switch (expr->kind) {
   case NK_X:
   case NK_Y:
@@ -490,7 +501,8 @@ bool compile_node_func_into_fragment_shader(String_Builder *sb, Node *f) {
   sb_append_cstr(sb, "  float y = fragTexCoord.y * 2.0 - 1.0;\n");
   sb_append_cstr(sb, "  float t = sin(time);\n");
   sb_append_cstr(sb, "  finalColor = map_color(");
-  if (!compile_node_func_into_fragment_expression(sb, f)) return false;
+  if (!compile_node_func_into_fragment_expression(sb, f))
+    return false;
   sb_append_cstr(sb, ");\n");
   sb_append_cstr(sb, "}\n");
 
@@ -498,32 +510,137 @@ bool compile_node_func_into_fragment_shader(String_Builder *sb, Node *f) {
 }
 
 int parse_optional_depth(char **argv, int argc_) {
-    if (argc_ >= 1 && strcmp(argv[0], "-depth") == 0) {
-      shift(argv, argc_);
-      if (argc_ >= 1) {
-        const char *depth_str = shift(argv, argc_);
-        if (depth_str) {
-          return atoi(depth_str);
-        } 
-      } else {
-        nob_log(WARNING, "Expected value after -depth flag, using default depth: %d", GRAMMAR_DEPTH);
-        return GRAMMAR_DEPTH;
+  if (argc_ >= 1 && strcmp(argv[0], "-depth") == 0) {
+    shift(argv, argc_);
+    if (argc_ >= 1) {
+      const char *depth_str = shift(argv, argc_);
+      if (depth_str) {
+        return atoi(depth_str);
       }
-    } 
-    nob_log(INFO, "No depth provided, using default depth: %d", GRAMMAR_DEPTH);
-    return GRAMMAR_DEPTH;
+    } else {
+      nob_log(WARNING,
+              "Expected value after -depth flag, using default depth: %d",
+              GRAMMAR_DEPTH);
+      return GRAMMAR_DEPTH;
+    }
+  }
+  nob_log(INFO, "No depth provided, using default depth: %d", GRAMMAR_DEPTH);
+  return GRAMMAR_DEPTH;
+}
+
+bool parse_node(Alexer *l, Node **node);
+
+bool parse_unary(Alexer *l, Node **value) {
+  Alexer_Token t = {0};
+
+  alexer_get_token(l, &t);
+  if (!alexer_expect_punct(l, t, PUNCT_OPAREN))
+    return false;
+
+  if (!parse_node(l, value))
+    return false;
+
+  alexer_get_token(l, &t);
+  if (!alexer_expect_punct(l, t, PUNCT_CPAREN))
+    return false;
+
+  return true;
+}
+
+bool parse_binop(Alexer *l, Node **first, Node **second) {
+  Alexer_Token t = {0};
+
+  alexer_get_token(l, &t);
+  if (!alexer_expect_punct(l, t, PUNCT_OPAREN))
+    return false;
+
+  if (!parse_node(l, first))
+    return false;
+
+  alexer_get_token(l, &t);
+  if (!alexer_expect_punct(l, t, PUNCT_COMMA))
+    return false;
+
+  if (!parse_node(l, second))
+    return false;
+
+  alexer_get_token(l, &t);
+  if (!alexer_expect_punct(l, t, PUNCT_CPAREN))
+    return false;
+
+  return true;
+}
+
+bool parse_triple(Alexer *l, Node **first, Node **second, Node **third) {
+  Alexer_Token t = {0};
+
+  alexer_get_token(l, &t);
+  if (!alexer_expect_punct(l, t, PUNCT_OPAREN))
+    return false;
+
+  if (!parse_node(l, first))
+    return false;
+
+  alexer_get_token(l, &t);
+  if (!alexer_expect_punct(l, t, PUNCT_COMMA))
+    return false;
+
+  if (!parse_node(l, second))
+    return false;
+
+  alexer_get_token(l, &t);
+  if (!alexer_expect_punct(l, t, PUNCT_COMMA))
+    return false;
+
+  if (!parse_node(l, third))
+    return false;
+
+  alexer_get_token(l, &t);
+  if (!alexer_expect_punct(l, t, PUNCT_CPAREN))
+    return false;
+
+  return true;
 }
 
 bool parse_node(Alexer *l, Node **node) {
-  Alexer_Token name = {0};
+  Alexer_Token t = {0};
 
-  alexer_get_token(l, &name);
-  if (!alexer_expect_kind(l, name, ALEXER_SYMBOL)) return false;
+  alexer_get_token(l, &t);
+  if (!alexer_expect_kind(l, t, ALEXER_SYMBOL))
+    return false;
+  // l->diagf(t.loc, "TRACE", Alexer_Token_Fmt, Alexer_Token_Arg(t));
 
-  UNUSED(node);
-  TODO("parse_node");
-  
-  return false;
+  if (alexer_token_text_equal_cstr(t, "random")) {
+    *node = node_loc(t.loc.file_path, t.loc.row, NK_RANDOM);
+  } else if (alexer_token_text_equal_cstr(t, "x")) {
+    *node = node_loc(t.loc.file_path, t.loc.row, NK_X);
+  } else if (alexer_token_text_equal_cstr(t, "y")) {
+    *node = node_loc(t.loc.file_path, t.loc.row, NK_Y);
+  } else if (alexer_token_text_equal_cstr(t, "sqrt")) {
+    Node *value;
+    if (!parse_unary(l, &value))
+      return false;
+    *node = node_unop_loc(t.loc.file_path, t.loc.row, NK_SQRT, value);
+  } else if (alexer_token_text_equal_cstr(t, "add")) {
+    Node *lhs, *rhs;
+    if (!parse_binop(l, &lhs, &rhs))
+      return false;
+    *node = node_binop_loc(t.loc.file_path, t.loc.row, NK_ADD, lhs, rhs);
+  } else if (alexer_token_text_equal_cstr(t, "mult")) {
+    Node *lhs, *rhs;
+    if (!parse_binop(l, &lhs, &rhs))
+      return false;
+    *node = node_binop_loc(t.loc.file_path, t.loc.row, NK_MULT, lhs, rhs);
+  } else if (alexer_token_text_equal_cstr(t, "vec3")) {
+    Node *first, *second, *third;
+    if (!parse_triple(l, &first, &second, &third))
+      return false;
+    *node = node_triple_loc(t.loc.file_path, t.loc.row, first, second, third);
+  } else {
+    *node = node_rule_from_token(t);
+  }
+
+  return true;
 }
 
 bool parse_grammar_branch(Alexer *l, Grammar_Branch *branch) {
@@ -537,36 +654,44 @@ bool parse_grammar_branch(Alexer *l, Grammar_Branch *branch) {
     alexer_get_token(l, &t);
   }
   alexer_rewind(l, s);
-  
-  if (!parse_node(l, &branch->node)) return false;
-  return false;
+
+  if (!parse_node(l, &branch->node))
+    return false;
+  return true;
 }
 
-bool parse_grammar_branches(Alexer *l, Alexer_Token name, Grammar_Branches *branches) {
-  branches->name = name;
-  
+bool parse_grammar_branches(Alexer *l, Alexer_Token name,
+                            Grammar_Branches *branches) {
   Alexer_Token t = {0};
+  branches->name = name;
 
   size_t branch_start[] = {PUNCT_BAR, PUNCT_SEMICOLON};
   bool quit = false;
-  
+
   while (!quit) {
     Alexer_State s = alexer_save(l);
 
     alexer_get_token(l, &t);
-    if (!alexer_expect_one_of_puncts(l, t, branch_start, ARRAY_LEN(branch_start))) return false;
+    if (!alexer_expect_one_of_puncts(l, t, branch_start,
+                                     ARRAY_LEN(branch_start)))
+      return false;
+    // l->diagf(t.loc, "TRACE", Alexer_Token_Fmt, Alexer_Token_Arg(t));
 
     switch (t.punct_index) {
     case PUNCT_BAR: {
-        alexer_rewind(l, s);
+      alexer_rewind(l, s);
 
-        Grammar_Branch branch = {};
-        if (!parse_grammar_branch(l, &branch)) return false;
-        arena_da_append(&node_arena, branches, branch);
-      } break;
+      Grammar_Branch branch = {};
+      if (!parse_grammar_branch(l, &branch))
+        return false;
+      arena_da_append(&node_arena, branches, branch);
+    } break;
 
-    case PUNCT_SEMICOLON: quit = true; break;
-    default: UNREACHABLE_CODE("parse_grammar_branches");
+    case PUNCT_SEMICOLON:
+      quit = true;
+      break;
+    default:
+      UNREACHABLE_CODE("parse_grammar_branches");
     }
   }
 
@@ -591,7 +716,8 @@ int main(int argc, char **argv) {
   const char *command_name = shift(argv, argc);
   if (strcmp(command_name, "file") == 0) {
     if (argc <= 0) {
-      nob_log(ERROR, "Usage: %s %s <output_path> -depth <depth>", program_name, command_name);
+      nob_log(ERROR, "Usage: %s %s <output_path> -depth <depth>", program_name,
+              command_name);
       nob_log(ERROR, "No output path is provided");
       return 1;
     }
@@ -611,8 +737,10 @@ int main(int argc, char **argv) {
     NODE_PRINT_LN(f);
 
     Image image = GenImageColor(IMAGE_WIDTH, IMAGE_HEIGHT, BLANK);
-    if (!render_pixels(image, f)) return 1;
-    if (!ExportImage(image, output_path)) return 1;
+    if (!render_pixels(image, f))
+      return 1;
+    if (!ExportImage(image, output_path))
+      return 1;
 
     return 0;
   }
@@ -648,14 +776,9 @@ int main(int argc, char **argv) {
       SetShaderValue(shader, time_loc, &time, SHADER_UNIFORM_FLOAT);
 
       BeginShaderMode(shader);
-      DrawTexturePro(
-        default_texture, 
-        (Rectangle){0, 0, 1, 1},
-        (Rectangle){0, 0, GetScreenWidth(), GetScreenHeight()},
-        (Vector2){0},
-        0, 
-        WHITE
-      );
+      DrawTexturePro(default_texture, (Rectangle){0, 0, 1, 1},
+                     (Rectangle){0, 0, GetScreenWidth(), GetScreenHeight()},
+                     (Vector2){0}, 0, WHITE);
       EndShaderMode();
 
       EndDrawing();
@@ -674,7 +797,8 @@ int main(int argc, char **argv) {
     const char *input_path = shift(argv, argc);
 
     String_Builder sb = {0};
-    if (!read_entire_file(input_path, &sb)) return 1;
+    if (!read_entire_file(input_path, &sb))
+      return 1;
 
     Alexer l = alexer_create(input_path, sb.items, sb.count);
     l.puncts = puncts;
@@ -690,21 +814,29 @@ int main(int argc, char **argv) {
 
     while (!quit) {
       alexer_get_token(&l, &t);
-      if (!alexer_expect_one_of_kinds(&l, t, top_level_start, ARRAY_LEN(top_level_start))) return 1;
+      if (!alexer_expect_one_of_kinds(&l, t, top_level_start,
+                                      ARRAY_LEN(top_level_start)))
+        return 1;
 
       switch (t.kind) {
       case ALEXER_SYMBOL: {
+        // l.diagf(t.loc, "TRACE", Alexer_Token_Fmt, Alexer_Token_Arg(t));
         Grammar_Branches branches = {0};
-        if (!parse_grammar_branches(&l, t, &branches)) return 1;
+        if (!parse_grammar_branches(&l, t, &branches))
+          return 1;
         arena_da_append(&node_arena, &grammar, branches);
-        return 0;
       } break;
 
-      case ALEXER_END: quit = true; break;
+      case ALEXER_END:
+        quit = true;
+        break;
       default:
         UNREACHABLE_CODE("top_level");
       }
     }
+
+    grammar_print(grammar);
+    return 0;
   }
 
   nob_log(ERROR, "Unknown command: %s", command_name);

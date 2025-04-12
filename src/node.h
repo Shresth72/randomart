@@ -125,8 +125,9 @@ Node *node_loc(const char *file, int line, Node_Kind kind);
 Node *node_number_loc(const char *file, int line, float number);
 Node *node_boolean_loc(const char *file, int line, bool boolean);
 Node *node_rule_loc(const char *file, int line, const char *rule);
+Node *node_rule_from_token_loc(const char *file, int line, Alexer_Token rule);
 
-Node *node_unop_loc(const char *file, int line, Node *value);
+Node *node_unop_loc(const char *file, int line, Node_Kind kind, Node *value);
 Node *node_sqrt_loc(const char *file, int line, Node *value);
 
 Node *node_binop_loc(const char *file, int line, Node_Kind kind, Node *lhs,
@@ -157,8 +158,9 @@ Node *node_if_loc(const char *file, int line, Node *cond, Node *then, Node *elze
 #define node_number(number) node_number_loc(__FILE__, __LINE__, number)
 #define node_boolean(number) node_boolean_loc(__FILE__, __LINE__, boolean)
 #define node_rule(rule) node_rule_loc(__FILE__, __LINE__, rule)
+#define node_rule_from_token(rule) node_rule_from_token_loc(__FILE__, __LINE__, rule)
 
-#define node_sqrt(value) node_unop_loc(__FILE__, __LINE__, value)
+#define node_sqrt(value) node_unop_loc(__FILE__, __LINE__, NK_SQRT, value)
 
 #define node_add(lhs, rhs) node_add_loc(__FILE__, __LINE__, lhs, rhs)
 #define node_mult(lhs, rhs) node_mult_loc(__FILE__, __LINE__, lhs, rhs)

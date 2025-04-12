@@ -13,14 +13,20 @@ Node *node_rule_loc(const char *file, int line, const char *rule) {
   return node;
 }
 
+Node *node_rule_from_token_loc(const char *file, int line, Alexer_Token rule) {
+  Node *node = node_loc(file, line, NK_RULE);
+  node->as.rule = rule;
+  return node;
+}
+
 Node *node_boolean_loc(const char *file, int line, bool boolean) {
   Node *node = node_loc(file, line, NK_BOOLEAN);
   node->as.boolean = boolean;
   return node;
 }
 
-Node *node_unop_loc(const char *file, int line, Node *value) {
-  Node *node = node_loc(file, line, NK_SQRT);
+Node *node_unop_loc(const char *file, int line, Node_Kind kind, Node *value) {
+  Node *node = node_loc(file, line, kind);
   node->as.unop = value;
   return node;
 }
