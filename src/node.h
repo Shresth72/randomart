@@ -24,7 +24,11 @@ typedef enum {
   NK_T,
   NK_NUMBER,
   NK_BOOLEAN,
+
+  // Unary Operations
   NK_SQRT,
+  NK_ABS,
+  NK_SIN,
 
   // Binary Operations
   NK_ADD,
@@ -46,11 +50,13 @@ typedef enum {
    : (kind) == NK_Y       ? "y"                                                \
    : (kind) == NK_T       ? "t"                                                \
    : (kind) == NK_NUMBER  ? "number"                                           \
+   : (kind) == NK_BOOLEAN ? "boolean"                                          \
+   : (kind) == NK_SQRT    ? "sqrt"                                             \
+   : (kind) == NK_ABS     ? "abs"                                              \
+   : (kind) == NK_SIN     ? "sin"                                              \
    : (kind) == NK_ADD     ? "add"                                              \
    : (kind) == NK_MULT    ? "mult"                                             \
    : (kind) == NK_MOD     ? "mod"                                              \
-   : (kind) == NK_BOOLEAN ? "boolean"                                          \
-   : (kind) == NK_SQRT    ? "sqrt"                                             \
    : (kind) == NK_GT      ? "gt"                                               \
    : (kind) == NK_TRIPLE  ? "triple"                                           \
    : (kind) == NK_IF      ? "if"                                               \
@@ -173,3 +179,51 @@ Node *node_if_loc(const char *file, int line, Node *cond, Node *then,
   node_triple_loc(__FILE__, __LINE__, first, second, third)
 #define node_if(cond, then, elze)                                              \
   node_if_loc(__FILE__, __LINE__, cond, then, elze)
+
+// PARSE NODE MACROS
+#define PARSE_EXPECT_PUNCT(l, t, punct)                                        \
+  alexer_get_token(l, &t);                                                     \
+  if (!alexer_expect_punct(l, t, punct))                                       \
+    return false;
+
+#define PARSE_NODES_ONCE(l, a)                                                 \
+  if (!parse_node(l, a))                                                       \
+    return false;
+
+#define PARSE_NODES_TWICE(l, a, b)                                             \
+  if (!parse_node(l, a))                                                       \
+    return false;                                                              \
+  PARSE_EXPECT_PUNCT(l, t, PUNCT_COMMA);                                       \
+  if (!parse_node(l, b))                                                       \
+    return false;
+
+#define PARSE_NODES_THRICE(l, a, b, c)                                         \
+  if (!parse_node(l, a))                                                       \
+    return false;                                                              \
+  PARSE_EXPECT_PUNCT(l, t, PUNCT_COMMA);                                       \
+  if (!parse_node(l, b))                                                       \
+    return false;                                                              \
+  PARSE_EXPECT_PUNCT(l, t, PUNCT_COMMA);                                       \
+  if (!parse_node(l, c))                                                       \
+    return false;
+
+#define PARSE_NODE_KIND(symbol, kind)                                          \
+  else if (alexer_token_text_equal_cstr(t, symbol)) {                          \
+    *node = node_loc(t.loc.file_path, t.loc.row, kind);                        \
+  }
+
+#define PARSE_UNOP(symbol, kind)                                               \
+  else if (alexer_token_text_equal_cstr(t, symbol)) {                          \
+    Node *value;                                                               \
+    if (!parse_unary(l, &value))                                               \
+      return false;                                                            \
+    *node = node_unop_loc(t.loc.file_path, t.loc.row, kind, value);            \
+  }
+
+#define PARSE_BINOP(symbol, kind)                                              \
+  else if (alexer_token_text_equal_cstr(t, symbol)) {                          \
+    Node *lhs, *rhs;                                                           \
+    if (!parse_binop(l, &lhs, &rhs))                                           \
+      return false;                                                            \
+    *node = node_binop_loc(t.loc.file_path, t.loc.row, kind, lhs, rhs);        \
+  }

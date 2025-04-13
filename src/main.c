@@ -139,14 +139,16 @@ Node *eval(Node *expr, float x, float y, float t) {
   case NK_BOOLEAN:
     return expr;
 
+  case NK_SQRT:
+  case NK_ABS:
+  case NK_SIN:
+    return eval_unop(expr, x, y, t, NK_NUMBER);
+
   case NK_ADD:
   case NK_MULT:
   case NK_MOD:
   case NK_GT:
     return eval_binop(expr, x, y, t, NK_NUMBER);
-
-  case NK_SQRT:
-    return eval_unop(expr, x, y, t, NK_NUMBER);
 
   case NK_TRIPLE: {
     Node *first = eval(expr->as.triple.first, x, y, t);
@@ -258,6 +260,16 @@ Node *gen_node(Grammar grammar, Node *node, int depth) {
   case NK_BOOLEAN:
     return node;
 
+  case NK_SQRT:
+  case NK_ABS:
+  case NK_SIN: {
+    Node *value = gen_node(grammar, node->as.unop, depth);
+    if (!value)
+      return NULL;
+
+    return node_unop_loc(node->file, node->line, node->kind, value);
+  }
+
   case NK_ADD:
   case NK_MULT:
   case NK_MOD:
@@ -270,14 +282,6 @@ Node *gen_node(Grammar grammar, Node *node, int depth) {
       return NULL;
 
     return node_binop_loc(node->file, node->line, node->kind, lhs, rhs);
-  }
-
-  case NK_SQRT: {
-    Node *value = gen_node(grammar, node->as.unop, depth);
-    if (!value)
-      return NULL;
-
-    return node_unop_loc(node->file, node->line, node->kind, value);
   }
 
   case NK_TRIPLE: {
@@ -423,6 +427,15 @@ bool compile_node_func_into_fragment_expression(String_Builder *sb,
     sb_append_cstr(sb, expr->as.boolean ? "true" : "false");
     break;
 
+  case NK_SQRT:
+  case NK_ABS:
+  case NK_SIN: {
+    sb_append_cstr(sb, temp_sprintf("%s(", node_kind_string(expr->kind)));
+    if (!compile_node_func_into_fragment_expression(sb, expr->as.unop))
+      return false;
+    sb_append_cstr(sb, ")");
+  } break;
+
   case NK_ADD:
   case NK_MULT:
   case NK_GT: {
@@ -441,13 +454,6 @@ bool compile_node_func_into_fragment_expression(String_Builder *sb,
       return false;
     sb_append_cstr(sb, ",");
     if (!compile_node_func_into_fragment_expression(sb, expr->as.binop.rhs))
-      return false;
-    sb_append_cstr(sb, ")");
-  } break;
-
-  case NK_SQRT: {
-    sb_append_cstr(sb, "sqrt(");
-    if (!compile_node_func_into_fragment_expression(sb, expr->as.unop))
       return false;
     sb_append_cstr(sb, ")");
   } break;
@@ -538,73 +544,25 @@ bool parse_node(Alexer *l, Node **node);
 
 bool parse_unary(Alexer *l, Node **value) {
   Alexer_Token t = {0};
-
-  alexer_get_token(l, &t);
-  if (!alexer_expect_punct(l, t, PUNCT_OPAREN))
-    return false;
-
-  if (!parse_node(l, value))
-    return false;
-
-  alexer_get_token(l, &t);
-  if (!alexer_expect_punct(l, t, PUNCT_CPAREN))
-    return false;
-
+  PARSE_EXPECT_PUNCT(l, t, PUNCT_OPAREN);
+  PARSE_NODES_ONCE(l, value);
+  PARSE_EXPECT_PUNCT(l, t, PUNCT_CPAREN);
   return true;
 }
 
 bool parse_binop(Alexer *l, Node **first, Node **second) {
   Alexer_Token t = {0};
-
-  alexer_get_token(l, &t);
-  if (!alexer_expect_punct(l, t, PUNCT_OPAREN))
-    return false;
-
-  if (!parse_node(l, first))
-    return false;
-
-  alexer_get_token(l, &t);
-  if (!alexer_expect_punct(l, t, PUNCT_COMMA))
-    return false;
-
-  if (!parse_node(l, second))
-    return false;
-
-  alexer_get_token(l, &t);
-  if (!alexer_expect_punct(l, t, PUNCT_CPAREN))
-    return false;
-
+  PARSE_EXPECT_PUNCT(l, t, PUNCT_OPAREN);
+  PARSE_NODES_TWICE(l, first, second);
+  PARSE_EXPECT_PUNCT(l, t, PUNCT_CPAREN);
   return true;
 }
 
 bool parse_triple(Alexer *l, Node **first, Node **second, Node **third) {
   Alexer_Token t = {0};
-
-  alexer_get_token(l, &t);
-  if (!alexer_expect_punct(l, t, PUNCT_OPAREN))
-    return false;
-
-  if (!parse_node(l, first))
-    return false;
-
-  alexer_get_token(l, &t);
-  if (!alexer_expect_punct(l, t, PUNCT_COMMA))
-    return false;
-
-  if (!parse_node(l, second))
-    return false;
-
-  alexer_get_token(l, &t);
-  if (!alexer_expect_punct(l, t, PUNCT_COMMA))
-    return false;
-
-  if (!parse_node(l, third))
-    return false;
-
-  alexer_get_token(l, &t);
-  if (!alexer_expect_punct(l, t, PUNCT_CPAREN))
-    return false;
-
+  PARSE_EXPECT_PUNCT(l, t, PUNCT_OPAREN);
+  PARSE_NODES_THRICE(l, first, second, third);
+  PARSE_EXPECT_PUNCT(l, t, PUNCT_CPAREN);
   return true;
 }
 
@@ -616,35 +574,25 @@ bool parse_node(Alexer *l, Node **node) {
     return false;
   // l->diagf(t.loc, "TRACE", Alexer_Token_Fmt, Alexer_Token_Arg(t));
 
-  if (alexer_token_text_equal_cstr(t, "random")) {
-    *node = node_loc(t.loc.file_path, t.loc.row, NK_RANDOM);
-  } else if (alexer_token_text_equal_cstr(t, "x")) {
-    *node = node_loc(t.loc.file_path, t.loc.row, NK_X);
-  } else if (alexer_token_text_equal_cstr(t, "y")) {
-    *node = node_loc(t.loc.file_path, t.loc.row, NK_Y);
-  } else if (alexer_token_text_equal_cstr(t, "t")) {
-    *node = node_loc(t.loc.file_path, t.loc.row, NK_T);
-  } else if (alexer_token_text_equal_cstr(t, "sqrt")) {
-    Node *value;
-    if (!parse_unary(l, &value))
-      return false;
-    *node = node_unop_loc(t.loc.file_path, t.loc.row, NK_SQRT, value);
-  } else if (alexer_token_text_equal_cstr(t, "add")) {
-    Node *lhs, *rhs;
-    if (!parse_binop(l, &lhs, &rhs))
-      return false;
-    *node = node_binop_loc(t.loc.file_path, t.loc.row, NK_ADD, lhs, rhs);
-  } else if (alexer_token_text_equal_cstr(t, "mult")) {
-    Node *lhs, *rhs;
-    if (!parse_binop(l, &lhs, &rhs))
-      return false;
-    *node = node_binop_loc(t.loc.file_path, t.loc.row, NK_MULT, lhs, rhs);
-  } else if (alexer_token_text_equal_cstr(t, "vec3")) {
+  if (false) {
+  }
+  PARSE_NODE_KIND("random", NK_RANDOM)
+  PARSE_NODE_KIND("x", NK_X)
+  PARSE_NODE_KIND("y", NK_Y)
+  PARSE_NODE_KIND("t", NK_T)
+  PARSE_UNOP("sqrt", NK_SQRT)
+  PARSE_UNOP("abs", NK_ABS)
+  PARSE_UNOP("sin", NK_SIN)
+  PARSE_BINOP("add", NK_ADD)
+  PARSE_BINOP("mult", NK_MULT)
+  PARSE_BINOP("mod", NK_MOD)
+  else if (alexer_token_text_equal_cstr(t, "vec3")) {
     Node *first, *second, *third;
     if (!parse_triple(l, &first, &second, &third))
       return false;
     *node = node_triple_loc(t.loc.file_path, t.loc.row, first, second, third);
-  } else {
+  }
+  else {
     *node = node_rule_from_token(t);
   }
 
