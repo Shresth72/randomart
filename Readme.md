@@ -23,8 +23,6 @@ cd src
 
 ### Grammar
 
-Grammar format:
-
 - `E`, `A`, `C` define each node
 - `|` defines the probability of that operation
 - Operations supported:
