@@ -10,7 +10,9 @@ A | random
   ;
 
 # Binary Operations
-C ||  A               # 1/4
-  ||| add(C, C)       # 3/8
-  ||| mult(C, C)      # 3/8
+C |  A
+  ||| add(C, C)
+  ||| mult(C, C)
+  ||| sqrt(abs(C))
+  ||| sin(abs(C))
   ;

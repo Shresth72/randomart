@@ -39,7 +39,8 @@ Node *node_unop_loc(const char *file, int line, Node_Kind kind, Node *value) {
   }
 NODE_UNOP_LOC(node_sqrt_loc, NK_SQRT);
 
-Node *node_binop_loc(const char *file, int line, Node_Kind kind, Node *lhs, Node *rhs) {
+Node *node_binop_loc(const char *file, int line, Node_Kind kind, Node *lhs,
+                     Node *rhs) {
   Node *node = node_loc(file, line, kind);
   node->as.binop.lhs = lhs;
   node->as.binop.rhs = rhs;
@@ -58,7 +59,8 @@ NODE_BINOP_LOC(node_mult_loc, NK_MULT);
 NODE_BINOP_LOC(node_mod_loc, NK_MOD);
 NODE_BINOP_LOC(node_gt_loc, NK_GT);
 
-Node *node_triple_loc(const char *file, int line, Node *first, Node *second, Node *third) {
+Node *node_triple_loc(const char *file, int line, Node *first, Node *second,
+                      Node *third) {
   Node *node = node_loc(file, line, NK_TRIPLE);
   node->as.triple.first = first;
   node->as.triple.second = second;
@@ -67,7 +69,8 @@ Node *node_triple_loc(const char *file, int line, Node *first, Node *second, Nod
   return node;
 }
 
-Node *node_if_loc(const char *file, int line, Node *cond, Node *then, Node *elze) {
+Node *node_if_loc(const char *file, int line, Node *cond, Node *then,
+                  Node *elze) {
   Node *node = node_loc(file, line, NK_IF);
   node->as.iff.cond = cond;
   node->as.iff.then = then;
@@ -114,12 +117,18 @@ Node *eval_binop(Node *expr, float x, float y, float t, Node_Kind kind) {
       BINOP_MAPPER(expr->kind, lhs->as.number, rhs->as.number));
 }
 
+#define UNOP_MAPPER(kind, val)                                                 \
+  ((kind) == NK_SQRT  ? (sqrtf(val))                                           \
+   : (kind) == NK_ABS ? (fabsf(val))                                           \
+   : (kind) == NK_SIN ? (sin(val))                                             \
+                      : 0)
 Node *eval_unop(Node *expr, float x, float y, float t, Node_Kind kind) {
   Node *value = eval(expr->as.unop, x, y, t);
   if (!value || !expect_kind(value, kind))
     return NULL;
 
-  return node_number_loc(expr->file, expr->line, sqrt(value->as.number));
+  return node_number_loc(expr->file, expr->line,
+                         UNOP_MAPPER(expr->kind, value->as.number));
 }
 
 void node_print(Node *node) {
@@ -138,6 +147,14 @@ void node_print(Node *node) {
     printf("%s", node->as.boolean ? "true" : "false");
     break;
 
+  case NK_SQRT:
+  case NK_ABS:
+  case NK_SIN:
+    printf("%s(", node_kind_string(node->kind));
+    node_print(node->as.unop);
+    printf(")");
+    break;
+
   case NK_ADD:
   case NK_MULT:
   case NK_MOD:
@@ -146,12 +163,6 @@ void node_print(Node *node) {
     node_print(node->as.binop.lhs);
     printf(", ");
     node_print(node->as.binop.rhs);
-    printf(")");
-    break;
-
-  case NK_SQRT:
-    printf("sqrt(");
-    node_print(node->as.unop);
     printf(")");
     break;
 
@@ -175,7 +186,8 @@ void node_print(Node *node) {
     break;
 
   case NK_RULE:
-    printf("%s("Alexer_Token_Fmt")", node_kind_string(node->kind), Alexer_Token_Arg(node->as.rule));
+    printf("%s(" Alexer_Token_Fmt ")", node_kind_string(node->kind),
+           Alexer_Token_Arg(node->as.rule));
     break;
   case NK_RANDOM:
     printf("%s", node_kind_string(node->kind));
