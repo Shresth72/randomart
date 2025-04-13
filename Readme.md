@@ -6,16 +6,15 @@ for each pixel coordinate. @tsoding
 
 ### Run
 
-Generate random image into a file (depth is optional)
+- Generate random image into a file (depth is optional)
 
 ```bash
 cd src
 ./nob run -depth <depth>
 ```
 
-Generate random shader code and render it into a gui using raylib.
-
-Both depth and grammar are optional, and order does not matter. If not specified, uses default values.
+- Generate random shader code and render it into a gui using raylib.
+  Both depth and grammar are optional, and order does not matter. If not specified, uses default values.
 
 ```bash
 cd src
