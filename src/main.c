@@ -438,21 +438,12 @@ bool compile_node_func_into_fragment_expression(String_Builder *sb,
 
   case NK_ADD:
   case NK_MULT:
-  case NK_GT: {
-    sb_append_cstr(sb, "(");
+  case NK_GT:
+  case NK_MOD: {
+    sb_append_cstr(sb, expr->kind == NK_MOD ? "mod(" : "(");
     if (!compile_node_func_into_fragment_expression(sb, expr->as.binop.lhs))
       return false;
     sb_append_cstr(sb, node_kind_operation(expr->kind));
-    if (!compile_node_func_into_fragment_expression(sb, expr->as.binop.rhs))
-      return false;
-    sb_append_cstr(sb, ")");
-  } break;
-
-  case NK_MOD: {
-    sb_append_cstr(sb, "mod(");
-    if (!compile_node_func_into_fragment_expression(sb, expr->as.binop.lhs))
-      return false;
-    sb_append_cstr(sb, ",");
     if (!compile_node_func_into_fragment_expression(sb, expr->as.binop.rhs))
       return false;
     sb_append_cstr(sb, ")");

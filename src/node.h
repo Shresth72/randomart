@@ -67,7 +67,7 @@ typedef enum {
 #define node_kind_operation(kind)                                              \
   ((kind) == NK_ADD    ? "+"                                                   \
    : (kind) == NK_MULT ? "*"                                                   \
-   : (kind) == NK_MOD  ? "%"                                                   \
+   : (kind) == NK_MOD  ? ","                                                   \
    : (kind) == NK_GT   ? ">"                                                   \
                        : "unknown")
 

@@ -7,6 +7,7 @@ A | random
   | x
   | y
   | t
+  | sqrt(add(mult(x, x), mult(y, y))) # distance
   ;
 
 # Binary Operations
