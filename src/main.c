@@ -327,6 +327,10 @@ Grammar_Branches *branches_by_name(Grammar *grammar, Alexer_Token rule) {
       return &grammar->items[i];
     }
   }
+
+  alexer_default_diagf(rule.loc, "ERROR",
+                       "Rule " Alexer_Token_Fmt " does not exist",
+                       Alexer_Token_Arg(rule));
   return NULL;
 }
 
@@ -335,6 +339,8 @@ Node *gen_rule(Grammar grammar, Alexer_Token rule, int depth) {
     return NULL;
 
   Grammar_Branches *branches = branches_by_name(&grammar, rule);
+  if (branches == NULL)
+    return NULL;
   assert(branches->count > 0);
 
   Node *node = NULL;
@@ -616,6 +622,8 @@ bool parse_node(Alexer *l, Node **node) {
     *node = node_loc(t.loc.file_path, t.loc.row, NK_X);
   } else if (alexer_token_text_equal_cstr(t, "y")) {
     *node = node_loc(t.loc.file_path, t.loc.row, NK_Y);
+  } else if (alexer_token_text_equal_cstr(t, "t")) {
+    *node = node_loc(t.loc.file_path, t.loc.row, NK_T);
   } else if (alexer_token_text_equal_cstr(t, "sqrt")) {
     Node *value;
     if (!parse_unary(l, &value))
@@ -703,6 +711,36 @@ bool parse_grammar_branches(Alexer *l, Alexer_Token name,
   return true;
 }
 
+bool parse_grammar(Alexer *l, Grammar *grammar) {
+  Alexer_Token t = {0};
+  Alexer_Kind top_level_start[] = {ALEXER_SYMBOL, ALEXER_END};
+  bool quit = false;
+
+  while (!quit) {
+    alexer_get_token(l, &t);
+    if (!alexer_expect_one_of_kinds(l, t, top_level_start,
+                                    ARRAY_LEN(top_level_start)))
+      return false;
+
+    switch (t.kind) {
+    case ALEXER_SYMBOL: {
+      // l.diagf(t.loc, "TRACE", Alexer_Token_Fmt, Alexer_Token_Arg(t));
+      Grammar_Branches branches = {0};
+      if (!parse_grammar_branches(l, t, &branches))
+        return false;
+      arena_da_append(&node_arena, grammar, branches);
+    } break;
+
+    case ALEXER_END:
+      quit = true;
+      break;
+    default:
+      UNREACHABLE_CODE("top_level");
+    }
+  }
+  return true;
+}
+
 int main(int argc, char **argv) {
   srand(time(0));
 
@@ -746,10 +784,32 @@ int main(int argc, char **argv) {
   }
 
   if (strcmp(command_name, "gui") == 0) {
-    InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "RandomArt");
+    if (argc <= 0) {
+      nob_log(ERROR, "Usage: %s %s <input>", program_name, command_name);
+      nob_log(ERROR, "No input is provided");
+      return 1;
+    }
+    const char *input_path = shift(argv, argc);
+
+    String_Builder source = {0};
+    if (!read_entire_file(input_path, &source))
+      return 1;
+
+    Alexer l = alexer_create(input_path, source.items, source.count);
+    l.puncts = puncts;
+    l.puncts_count = COUNT_PUNCTS;
+    l.sl_comments = comments;
+    l.sl_comments_count = ARRAY_LEN(comments);
 
     Grammar grammar = {0};
-    Alexer_Token entry = simple_grammar(&grammar);
+    if (!parse_grammar(&l, &grammar))
+      return 1;
+    // grammar_print(grammar);
+    assert(grammar.count > 0);
+
+    // Alexer_Token entry = simple_grammar(&grammar);
+    Alexer_Token entry = grammar.items[0].name;
+
     Node *f = gen_rule(grammar, entry, parse_optional_depth(argv, argc));
     if (!f) {
       nob_log(ERROR, "Process could not terminate\n");
@@ -763,8 +823,10 @@ int main(int argc, char **argv) {
     sb_append_null(&sb);
     printf("%s", sb.items);
 
-    Shader shader = LoadShaderFromMemory(NULL, sb.items);
+    // Initialize rendering
+    InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "RandomArt");
 
+    Shader shader = LoadShaderFromMemory(NULL, sb.items);
     int time_loc = GetShaderLocation(shader, "time");
     Texture default_texture = GetDefaultTexture();
 
@@ -784,58 +846,6 @@ int main(int argc, char **argv) {
       EndDrawing();
     }
 
-    return 0;
-  }
-
-  if (strcmp(command_name, "parse") == 0) {
-    if (argc <= 0) {
-      nob_log(ERROR, "Usage: %s %s <input>", program_name, command_name);
-      nob_log(ERROR, "No input is provided");
-      return 1;
-    }
-
-    const char *input_path = shift(argv, argc);
-
-    String_Builder sb = {0};
-    if (!read_entire_file(input_path, &sb))
-      return 1;
-
-    Alexer l = alexer_create(input_path, sb.items, sb.count);
-    l.puncts = puncts;
-    l.puncts_count = COUNT_PUNCTS;
-    l.sl_comments = comments;
-    l.sl_comments_count = ARRAY_LEN(comments);
-
-    Alexer_Token t = {0};
-    Alexer_Kind top_level_start[] = {ALEXER_SYMBOL, ALEXER_END};
-    bool quit = false;
-
-    Grammar grammar = {0};
-
-    while (!quit) {
-      alexer_get_token(&l, &t);
-      if (!alexer_expect_one_of_kinds(&l, t, top_level_start,
-                                      ARRAY_LEN(top_level_start)))
-        return 1;
-
-      switch (t.kind) {
-      case ALEXER_SYMBOL: {
-        // l.diagf(t.loc, "TRACE", Alexer_Token_Fmt, Alexer_Token_Arg(t));
-        Grammar_Branches branches = {0};
-        if (!parse_grammar_branches(&l, t, &branches))
-          return 1;
-        arena_da_append(&node_arena, &grammar, branches);
-      } break;
-
-      case ALEXER_END:
-        quit = true;
-        break;
-      default:
-        UNREACHABLE_CODE("top_level");
-      }
-    }
-
-    grammar_print(grammar);
     return 0;
   }
 

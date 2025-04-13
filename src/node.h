@@ -115,8 +115,7 @@ Node *cool_gradient_ast();
 void node_print(Node *node);
 bool expect_kind(Node *expr, Node_Kind kind);
 
-#define SYMBOL(name_cstr) \
-  symbol_impl(__FILE__, __LINE__, name_cstr)
+#define SYMBOL(name_cstr) symbol_impl(__FILE__, __LINE__, name_cstr)
 Alexer_Token symbol_impl(const char *file, int line, const char *name_cstr);
 
 // GRAMMAR FUNCTIONS
@@ -137,8 +136,10 @@ Node *node_mult_loc(const char *file, int line, Node *lhs, Node *rhs);
 Node *node_mod_loc(const char *file, int line, Node *lhs, Node *rhs);
 Node *node_gt_loc(const char *file, int line, Node *lhs, Node *rhs);
 
-Node *node_triple_loc(const char *file, int line, Node *first, Node *second, Node *third);
-Node *node_if_loc(const char *file, int line, Node *cond, Node *then, Node *elze);
+Node *node_triple_loc(const char *file, int line, Node *first, Node *second,
+                      Node *third);
+Node *node_if_loc(const char *file, int line, Node *cond, Node *then,
+                  Node *elze);
 
 // UTIL MACROS
 #define NODE_PRINT_LN(node) (node_print(node), printf("\n"))
@@ -158,7 +159,8 @@ Node *node_if_loc(const char *file, int line, Node *cond, Node *then, Node *elze
 #define node_number(number) node_number_loc(__FILE__, __LINE__, number)
 #define node_boolean(number) node_boolean_loc(__FILE__, __LINE__, boolean)
 #define node_rule(rule) node_rule_loc(__FILE__, __LINE__, rule)
-#define node_rule_from_token(rule) node_rule_from_token_loc(__FILE__, __LINE__, rule)
+#define node_rule_from_token(rule)                                             \
+  node_rule_from_token_loc(__FILE__, __LINE__, rule)
 
 #define node_sqrt(value) node_unop_loc(__FILE__, __LINE__, NK_SQRT, value)
 

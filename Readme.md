@@ -13,9 +13,11 @@ cd src
 ./nob run -depth <depth>
 ```
 
-Generate random shader code and render it into a gui using raylib
+Generate random shader code and render it into a gui using raylib.
+
+Both depth and grammar are optional, and order does not matter. If not specified, uses default values.
 
 ```bash
 cd src
-./nob gui -depth <depth>
+./nob gui -grammar <path> -depth <depth>
 ```

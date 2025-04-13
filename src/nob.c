@@ -48,6 +48,22 @@ void cmd_append_optional_depth(Nob_Cmd *cmd, char **argv, int argc_) {
   }
 }
 
+void cmd_append_optional_grammar_path(Nob_Cmd *cmd, char **argv, int argc_) {
+  const char *grammar_path = "./grammars/grammar.bnf";
+
+  for (int i = 0; i < argc_ - 1; ++i) {
+    if (strcmp(argv[i], "-grammar") == 0) {
+      grammar_path = argv[i + 1];
+      for (int j = i; j < argc_ - 2; ++j) {
+        argv[j] = argv[j + 2];
+      }
+      argc_ -= 2;
+      break;
+    }
+  }
+  cmd_append(cmd, grammar_path);
+}
+
 int main(int argc, char *argv[]) {
   NOB_GO_REBUILD_URSELF(argc, argv);
 
@@ -81,11 +97,8 @@ int main(int argc, char *argv[]) {
         return 1;
     } else if (strcmp(subcommand, "gui") == 0) {
       cmd_append(&cmd, "./main", "gui");
+      cmd_append_optional_grammar_path(&cmd, argv, argc);
       cmd_append_optional_depth(&cmd, argv, argc);
-      if (!cmd_run_sync_and_reset(&cmd))
-        return 1;
-    } else if (strcmp(subcommand, "parse") == 0) {
-      cmd_append(&cmd, "./main", "parse", "./grammars/grammar.bnf");
       if (!cmd_run_sync_and_reset(&cmd))
         return 1;
     } else {
